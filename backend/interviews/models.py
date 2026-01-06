@@ -1,3 +1,4 @@
+from django.contrib.auth.models import User
 from django.db import models
 
 
@@ -5,6 +6,7 @@ class Interview(models.Model):
     """
     Represents a job interview. This is the core model for the Interview Coordinator app.
     Tracks company, position, scheduling details, and status of each interview.
+    Each interview belongs to a specific user (ForeignKey relationship).
     """
 
     # Choices for interview_type field - represents the stage/format of the interview
@@ -28,6 +30,15 @@ class Interview(models.Model):
         ("remote", "Remote"),
         ("hybrid", "Hybrid"),
     ]
+
+    # User ownership - each interview belongs to one user
+    # CASCADE means if user is deleted, their interviews are also deleted
+    # related_name allows reverse lookup: user.interviews.all()
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="interviews",
+    )
 
     # Core interview details
     company_name = models.CharField(max_length=200)

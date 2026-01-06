@@ -15,3 +15,12 @@ django-filter>=23.5,<24.0
 
 # Utilities
 pytz
+
+# Authentication - JWT tokens for stateless auth
+djangorestframework-simplejwt>=5.3,<6.0
+# Authentication - provides login/logout/register endpoints out of the box
+dj-rest-auth>=6.0,<7.0
+# Authentication - handles user registration, email verification, social auth
+django-allauth>=64.0,<65.0
+# HTTP library - required by django-allauth for OAuth/social auth
+requests>=2.31,<3.0
