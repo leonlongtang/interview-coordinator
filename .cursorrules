@@ -1,0 +1,95 @@
+# ============================
+# Cursor Rules — Full Stack App
+# Django + PostgreSQL + React
+# ============================
+
+# ---------- General ----------
+- Prefer clarity over cleverness.
+- Follow existing project structure strictly.
+- Do not introduce new dependencies without explicit justification.
+- Keep files small and focused; split when logic grows.
+- Avoid premature abstractions.
+
+# ---------- Backend (Django API) ----------
+- Backend is API-only; do NOT use Django templates.
+- Use feature-based apps under backend/apps/.
+- Each app owns its:
+  - models
+  - serializers
+  - views
+  - urls
+- Business logic must NOT live in views.
+- Views should orchestrate only (request → service → response).
+
+# ---------- PostgreSQL ----------
+- PostgreSQL is the primary database.
+- Use Django's ORM for all database operations.
+- Keep database access centralized:
+  - models in each app's models.py
+  - no raw SQL in views (use ORM or managers)
+- Use Django migrations for all schema changes.
+- Always consider indexes for frequently queried fields.
+- Use select_related/prefetch_related to avoid N+1 queries.
+
+# ---------- Validation & Serialization ----------
+- All input validation must happen in serializers or schema layers.
+- Never trust request data directly.
+- Output responses must be serialized explicitly.
+
+# ---------- Error Handling ----------
+- Use custom exceptions for domain errors.
+- Do not leak internal errors to API responses.
+- Always return consistent error formats.
+
+# ---------- Frontend (React + Vite) ----------
+- Use feature-based structure under src/features/.
+- Components should be presentational by default.
+- Business logic belongs in:
+  - hooks
+  - feature-level services
+- Avoid large components (>200 lines).
+- Use hooks instead of class components.
+
+# ---------- State Management ----------
+- Prefer React hooks and local state.
+- Introduce global state only when necessary.
+- Keep API calls out of UI components.
+
+# ---------- API Communication ----------
+- All API calls must go through a centralized client (e.g. apiClient).
+- Do not call fetch/axios directly inside components.
+- Handle auth headers and errors in the API layer.
+
+# ---------- Styling ----------
+- Use Tailwind CSS utilities.
+- Avoid custom CSS unless necessary.
+- Global styles belong in styles/globals.css.
+
+# ---------- Testing ----------
+- Backend:
+  - Prefer unit tests for business logic.
+  - Integration tests for API boundaries.
+- Frontend:
+  - Test logic-heavy hooks.
+  - Avoid snapshot-heavy tests.
+
+# ---------- Security ----------
+- Never hardcode secrets.
+- Use environment variables for configuration.
+- Assume all client input is malicious.
+
+# ---------- Performance ----------
+- Avoid unnecessary re-renders in React.
+- Paginate API responses by default.
+- Be mindful of database query performance (use Django Debug Toolbar).
+
+# ---------- Code Style ----------
+- Use descriptive naming.
+- Avoid abbreviations.
+- Prefer explicit returns and early exits.
+- Comments explain WHY, not WHAT.
+
+# ---------- AI-Specific Guardrails ----------
+- Do NOT generate boilerplate that duplicates existing patterns.
+- Do NOT invent files or folders that do not exist.
+- Ask for clarification only when architectural intent is unclear.
