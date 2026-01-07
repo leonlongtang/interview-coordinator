@@ -1,10 +1,11 @@
 import type { Interview } from "../types";
 import { formatInterviewDate, getRelativeTime, isDatePast } from "../utils/dateUtils";
 import { Button } from "./ui";
+import StatusBadge from "./StatusBadge";
 
 /**
  * Card component displaying a single interview.
- * Shows key info at a glance with edit/delete actions.
+ * Shows key info at a glance with pipeline stage, edit/delete actions.
  */
 
 interface InterviewCardProps {
@@ -18,13 +19,6 @@ export default function InterviewCard({
   onEdit,
   onDelete,
 }: InterviewCardProps) {
-  // Status badge colors
-  const statusColors = {
-    scheduled: "bg-blue-100 text-blue-800",
-    completed: "bg-green-100 text-green-800",
-    cancelled: "bg-red-100 text-red-800",
-  };
-
   // Interview type badge colors
   const typeColors = {
     phone: "bg-purple-100 text-purple-800",
@@ -44,32 +38,40 @@ export default function InterviewCard({
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
-      {/* Header: Company & Position */}
+      {/* Header: Company & Position with Pipeline Stage */}
       <div className="flex items-start justify-between gap-4 mb-3">
-        <div>
-          <h3 className="font-semibold text-lg text-gray-900">
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-lg text-gray-900 truncate">
             {interview.company_name}
           </h3>
-          <p className="text-gray-600">{interview.position}</p>
+          <p className="text-gray-600 truncate">{interview.position}</p>
         </div>
-        <span
-          className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-            statusColors[interview.status]
-          }`}
-        >
-          {interview.status.charAt(0).toUpperCase() + interview.status.slice(1)}
-        </span>
+        <StatusBadge stage={interview.pipeline_stage} size="sm" />
       </div>
 
-      {/* Date & Time */}
+      {/* Date & Time with "Upcoming" indicator */}
       <div className={`mb-3 ${isPast && interview.status === "scheduled" ? "text-red-600" : "text-gray-700"}`}>
-        <p className="font-medium">
-          {formatInterviewDate(interview.interview_date)}
-        </p>
+        <div className="flex items-center gap-2">
+          <p className="font-medium">
+            {formatInterviewDate(interview.interview_date)}
+          </p>
+          {interview.is_upcoming && interview.status === "scheduled" && (
+            <span className="px-1.5 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded">
+              Upcoming
+            </span>
+          )}
+        </div>
         <p className="text-sm text-gray-500">
           {getRelativeTime(interview.interview_date)}
         </p>
       </div>
+
+      {/* Days in Pipeline */}
+      {interview.days_in_pipeline !== null && interview.days_in_pipeline !== undefined && (
+        <p className="text-xs text-gray-500 mb-2">
+          {interview.days_in_pipeline} day{interview.days_in_pipeline !== 1 ? "s" : ""} in pipeline
+        </p>
+      )}
 
       {/* Tags: Type & Location */}
       <div className="flex flex-wrap gap-2 mb-3">

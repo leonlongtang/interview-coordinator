@@ -1,6 +1,20 @@
 import api from "./api";
 
 /**
+ * Pipeline stage type - represents where the candidate is in the hiring process.
+ */
+export type PipelineStage =
+  | "applied"
+  | "screening"
+  | "technical"
+  | "onsite"
+  | "final"
+  | "offer"
+  | "rejected"
+  | "accepted"
+  | "declined";
+
+/**
  * Interview data structure matching our Django model.
  */
 export interface Interview {
@@ -11,16 +25,24 @@ export interface Interview {
   interview_type: "phone" | "technical" | "behavioral" | "final";
   status: "scheduled" | "completed" | "cancelled";
   location: "onsite" | "remote" | "hybrid";
+  pipeline_stage: PipelineStage;
+  application_date?: string | null;
   notes?: string | null;
   created_at: string;
   updated_at: string;
+  // Computed fields from backend
+  days_in_pipeline?: number | null;
+  is_upcoming?: boolean;
 }
 
 /**
  * Data required to create or update an interview.
- * Omits auto-generated fields (id, created_at, updated_at).
+ * Omits auto-generated and computed fields.
  */
-export type InterviewFormData = Omit<Interview, "id" | "created_at" | "updated_at">;
+export type InterviewFormData = Omit<
+  Interview,
+  "id" | "created_at" | "updated_at" | "days_in_pipeline" | "is_upcoming"
+>;
 
 /**
  * Service layer for Interview API operations.

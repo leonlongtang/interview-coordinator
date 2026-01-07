@@ -5,11 +5,11 @@ from django.db import models
 class Interview(models.Model):
     """
     Represents a job interview. This is the core model for the Interview Coordinator app.
-    Tracks company, position, scheduling details, and status of each interview.
+    Tracks company, position, scheduling details, pipeline stage, and status of each interview.
     Each interview belongs to a specific user (ForeignKey relationship).
     """
 
-    # Choices for interview_type field - represents the stage/format of the interview
+    # Choices for interview_type field - represents the format of the interview
     TYPE_CHOICES = [
         ("phone", "Phone Screen"),
         ("technical", "Technical"),
@@ -17,7 +17,7 @@ class Interview(models.Model):
         ("final", "Final Round"),
     ]
 
-    # Choices for status field - tracks the current state of the interview
+    # Choices for status field - tracks the current state of the interview appointment
     STATUS_CHOICES = [
         ("scheduled", "Scheduled"),
         ("completed", "Completed"),
@@ -29,6 +29,20 @@ class Interview(models.Model):
         ("onsite", "On-site"),
         ("remote", "Remote"),
         ("hybrid", "Hybrid"),
+    ]
+
+    # Pipeline stage choices - tracks overall job application progress
+    # This represents where the candidate is in the hiring pipeline
+    PIPELINE_CHOICES = [
+        ("applied", "Applied"),
+        ("screening", "Phone Screening"),
+        ("technical", "Technical Interview"),
+        ("onsite", "Onsite Interview"),
+        ("final", "Final Round"),
+        ("offer", "Offer Received"),
+        ("rejected", "Rejected"),
+        ("accepted", "Accepted"),
+        ("declined", "Declined"),
     ]
 
     # User ownership - each interview belongs to one user
@@ -62,6 +76,16 @@ class Interview(models.Model):
         default="remote",
     )
 
+    # Pipeline tracking - where the candidate is in the overall hiring process
+    pipeline_stage = models.CharField(
+        max_length=20,
+        choices=PIPELINE_CHOICES,
+        default="applied",
+    )
+
+    # Date when the application was submitted (optional, for tracking time in pipeline)
+    application_date = models.DateField(null=True, blank=True)
+
     # Optional notes field for additional context
     notes = models.TextField(blank=True, null=True)
 
@@ -76,3 +100,11 @@ class Interview(models.Model):
     def __str__(self):
         """String representation shown in admin and shell."""
         return f"{self.company_name} - {self.position}"
+
+    @property
+    def days_in_pipeline(self):
+        """Calculate how many days since application was submitted."""
+        if self.application_date:
+            from django.utils import timezone
+            return (timezone.now().date() - self.application_date).days
+        return None

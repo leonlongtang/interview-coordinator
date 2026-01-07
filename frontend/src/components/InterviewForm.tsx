@@ -5,11 +5,13 @@ import {
   INTERVIEW_TYPE_OPTIONS,
   STATUS_OPTIONS,
   LOCATION_OPTIONS,
+  PIPELINE_STAGE_OPTIONS,
 } from "../types";
 
 /**
  * Form component for creating/editing interviews.
  * Handles validation and submission with loading states.
+ * Includes pipeline stage tracking for job application progress.
  */
 
 interface InterviewFormProps {
@@ -33,6 +35,8 @@ export default function InterviewForm({
     interview_type: initialData?.interview_type || "phone",
     status: initialData?.status || "scheduled",
     location: initialData?.location || "remote",
+    pipeline_stage: initialData?.pipeline_stage || "applied",
+    application_date: initialData?.application_date || "",
     notes: initialData?.notes || "",
   });
 
@@ -85,6 +89,8 @@ export default function InterviewForm({
       const submitData = {
         ...formData,
         interview_date: new Date(formData.interview_date).toISOString(),
+        // Convert empty string to null for optional date field
+        application_date: formData.application_date || null,
       };
       await onSubmit(submitData);
     } catch (error) {
@@ -95,6 +101,12 @@ export default function InterviewForm({
       setIsLoading(false);
     }
   };
+
+  // Pipeline stage options formatted for Select component
+  const pipelineOptions = PIPELINE_STAGE_OPTIONS.map(({ value, label }) => ({
+    value,
+    label,
+  }));
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -127,7 +139,26 @@ export default function InterviewForm({
         />
       </div>
 
-      {/* Date & Time */}
+      {/* Pipeline Stage & Application Date */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Select
+          label="Pipeline Stage"
+          name="pipeline_stage"
+          value={formData.pipeline_stage}
+          onChange={handleChange}
+          options={pipelineOptions}
+          required
+        />
+        <Input
+          label="Application Date (optional)"
+          name="application_date"
+          type="date"
+          value={formData.application_date || ""}
+          onChange={handleChange}
+        />
+      </div>
+
+      {/* Interview Date & Time */}
       <Input
         label="Interview Date & Time"
         name="interview_date"
@@ -149,7 +180,7 @@ export default function InterviewForm({
           required
         />
         <Select
-          label="Status"
+          label="Appointment Status"
           name="status"
           value={formData.status}
           onChange={handleChange}
