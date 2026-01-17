@@ -2,7 +2,13 @@
  * Re-export types from services for convenient imports.
  * Components can import from '@/types' instead of digging into services.
  */
-export type { Interview, InterviewFormData, PipelineStage } from "../services/interviewService";
+export type { 
+  Interview, 
+  InterviewFormData, 
+  InterviewStage, 
+  ApplicationStatus,
+  PipelineStage,  // Kept for backwards compatibility
+} from "../services/interviewService";
 export type { UserProfile, UserProfileUpdate, TestEmailResponse } from "./profile";
 
 /**
@@ -28,8 +34,33 @@ export const LOCATION_OPTIONS = [
 ] as const;
 
 /**
- * Pipeline stage options - tracks overall job application progress.
- * Each stage has a value, label, and associated color for the UI.
+ * Interview stage options - where you are in the interview process.
+ * Separate from outcome/status.
+ */
+export const INTERVIEW_STAGE_OPTIONS = [
+  { value: "applied", label: "Applied", color: "gray", icon: "📝" },
+  { value: "screening", label: "Phone Screening", color: "blue", icon: "📞" },
+  { value: "technical", label: "Technical Interview", color: "purple", icon: "💻" },
+  { value: "onsite", label: "Onsite Interview", color: "indigo", icon: "🏢" },
+  { value: "final", label: "Final Round", color: "yellow", icon: "🎯" },
+  { value: "completed", label: "Completed", color: "teal", icon: "✅" },
+] as const;
+
+/**
+ * Application status options - the outcome/decision of the application.
+ */
+export const APPLICATION_STATUS_OPTIONS = [
+  { value: "in_progress", label: "In Progress", color: "sky", icon: "🔄" },
+  { value: "offer", label: "Offer Received", color: "green", icon: "🎉" },
+  { value: "accepted", label: "Accepted", color: "emerald", icon: "✨" },
+  { value: "rejected", label: "Rejected", color: "red", icon: "❌" },
+  { value: "declined", label: "Declined", color: "orange", icon: "🚫" },
+  { value: "withdrawn", label: "Withdrawn", color: "gray", icon: "↩️" },
+] as const;
+
+/**
+ * @deprecated Use INTERVIEW_STAGE_OPTIONS and APPLICATION_STATUS_OPTIONS instead.
+ * Kept for backwards compatibility during transition.
  */
 export const PIPELINE_STAGE_OPTIONS = [
   { value: "applied", label: "Applied", color: "gray" },

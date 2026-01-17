@@ -97,7 +97,7 @@ def dashboard_stats(request):
     """
     Aggregate statistics for the user's dashboard.
     
-    Returns counts by pipeline stage, upcoming interviews,
+    Returns counts by interview stage, application status, upcoming interviews,
     and summary metrics like total interviews and success rate.
     """
     user = request.user
@@ -105,16 +105,22 @@ def dashboard_stats(request):
     now = timezone.now()
     seven_days_later = now + timedelta(days=7)
 
-    # Count interviews in each pipeline stage
-    by_stage = {}
-    for stage_code, stage_label in Interview.PIPELINE_CHOICES:
-        by_stage[stage_code] = interviews.filter(pipeline_stage=stage_code).count()
+    # Count interviews by interview stage (where in the process)
+    by_interview_stage = {}
+    for stage_code, stage_label in Interview.INTERVIEW_STAGE_CHOICES:
+        by_interview_stage[stage_code] = interviews.filter(interview_stage=stage_code).count()
+
+    # Count interviews by application status (outcome)
+    by_application_status = {}
+    for status_code, status_label in Interview.APPLICATION_STATUS_CHOICES:
+        by_application_status[status_code] = interviews.filter(application_status=status_code).count()
 
     # Upcoming interviews (scheduled within next 7 days, not cancelled)
     upcoming_interviews = interviews.filter(
         interview_date__gte=now,
         interview_date__lte=seven_days_later,
         status="scheduled",
+        application_status="in_progress",  # Only show if still in progress
     ).order_by("interview_date")
 
     # Serialize upcoming interviews for the widget
@@ -130,15 +136,65 @@ def dashboard_stats(request):
         for i in upcoming_interviews[:5]  # Limit to 5 for the widget
     ]
 
-    # Calculate summary stats
-    total = interviews.count()
-    offers = by_stage.get("offer", 0) + by_stage.get("accepted", 0)
-    active = total - by_stage.get("rejected", 0) - by_stage.get("declined", 0) - by_stage.get("accepted", 0)
+    # Awaiting response: applied but no interview scheduled yet
+    # These are applications where user is waiting to hear back
+    awaiting_response = interviews.filter(
+        interview_date__isnull=True,
+        interview_stage__in=["applied", "screening"],  # Early stages without scheduled interview
+        application_status="in_progress",  # Still active
+    ).order_by("-application_date", "-created_at")
 
-    # Success rate: (offers + accepted) / total completed applications
-    # Completed = offer, rejected, accepted, declined
-    completed = offers + by_stage.get("rejected", 0) + by_stage.get("declined", 0)
-    success_rate = round((offers / completed) * 100, 1) if completed > 0 else 0
+    awaiting_list = [
+        {
+            "id": i.id,
+            "company_name": i.company_name,
+            "position": i.position,
+            "application_date": i.application_date.isoformat() if i.application_date else None,
+            "interview_stage": i.interview_stage,
+            "days_waiting": (timezone.now().date() - i.application_date).days if i.application_date else None,
+        }
+        for i in awaiting_response[:5]  # Limit to 5 for the widget
+    ]
+
+    # Needs review: interviews that have passed but status not updated
+    # These need user to record how the interview went and update status
+    needs_review = interviews.filter(
+        interview_date__lt=now,
+        status="scheduled",  # Still marked as scheduled but date has passed
+        application_status="in_progress",  # Not yet resolved
+    ).order_by("-interview_date")
+
+    needs_review_list = [
+        {
+            "id": i.id,
+            "company_name": i.company_name,
+            "position": i.position,
+            "interview_date": i.interview_date.isoformat(),
+            "interview_type": i.interview_type,
+            "interview_stage": i.interview_stage,
+            "days_ago": (now.date() - i.interview_date.date()).days,
+        }
+        for i in needs_review[:5]  # Limit to 5 for the widget
+    ]
+
+    # Calculate summary stats using new fields
+    total = interviews.count()
+    
+    # Offers = offer received + accepted
+    offers = by_application_status.get("offer", 0) + by_application_status.get("accepted", 0)
+    
+    # Active = still in progress
+    active = by_application_status.get("in_progress", 0)
+
+    # Success rate: (offers + accepted) / total resolved applications
+    # Resolved = offer, rejected, accepted, declined (not in_progress or withdrawn)
+    resolved = (
+        by_application_status.get("offer", 0) +
+        by_application_status.get("accepted", 0) +
+        by_application_status.get("rejected", 0) +
+        by_application_status.get("declined", 0)
+    )
+    success_rate = round((offers / resolved) * 100, 1) if resolved > 0 else 0
 
     return Response({
         "total": total,
@@ -147,5 +203,10 @@ def dashboard_stats(request):
         "success_rate": success_rate,
         "upcoming_count": upcoming_interviews.count(),
         "upcoming_interviews": upcoming_list,
-        "by_stage": by_stage,
+        "awaiting_count": awaiting_response.count(),
+        "awaiting_response": awaiting_list,
+        "needs_review_count": needs_review.count(),
+        "needs_review": needs_review_list,
+        "by_interview_stage": by_interview_stage,
+        "by_application_status": by_application_status,
     })

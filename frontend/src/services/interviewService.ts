@@ -1,7 +1,30 @@
 import api from "./api";
 
 /**
- * Pipeline stage type - represents where the candidate is in the hiring process.
+ * Interview stage type - where you are in the interview process.
+ */
+export type InterviewStage =
+  | "applied"
+  | "screening"
+  | "technical"
+  | "onsite"
+  | "final"
+  | "completed";
+
+/**
+ * Application status type - the outcome/decision of the application.
+ */
+export type ApplicationStatus =
+  | "in_progress"
+  | "offer"
+  | "accepted"
+  | "rejected"
+  | "declined"
+  | "withdrawn";
+
+/**
+ * @deprecated Use InterviewStage and ApplicationStatus instead.
+ * Kept for backwards compatibility during transition.
  */
 export type PipelineStage =
   | "applied"
@@ -21,10 +44,16 @@ export interface Interview {
   id: number;
   company_name: string;
   position: string;
-  interview_date: string;
-  interview_type: "phone" | "technical" | "behavioral" | "final";
-  status: "scheduled" | "completed" | "cancelled";
-  location: "onsite" | "remote" | "hybrid";
+  // Optional - null when application submitted but no interview scheduled yet
+  interview_date: string | null;
+  // These fields are optional until an interview is scheduled
+  interview_type: "phone" | "technical" | "behavioral" | "final" | null;
+  status: "scheduled" | "completed" | "cancelled" | null;
+  location: "onsite" | "remote" | "hybrid" | null;
+  // New split fields
+  interview_stage: InterviewStage;
+  application_status: ApplicationStatus;
+  // Legacy field (kept for backwards compatibility)
   pipeline_stage: PipelineStage;
   application_date?: string | null;
   notes?: string | null;
@@ -55,7 +84,12 @@ export interface DashboardStats {
   success_rate: number;
   upcoming_count: number;
   upcoming_interviews: UpcomingInterview[];
-  by_stage: Record<PipelineStage, number>;
+  awaiting_count: number;
+  awaiting_response: AwaitingInterview[];
+  needs_review_count: number;
+  needs_review: NeedsReviewInterview[];
+  by_interview_stage: Record<InterviewStage, number>;
+  by_application_status: Record<ApplicationStatus, number>;
 }
 
 /**
@@ -68,6 +102,31 @@ export interface UpcomingInterview {
   interview_date: string;
   interview_type: string;
   location: string;
+}
+
+/**
+ * Interview data for applications awaiting response (no interview scheduled yet).
+ */
+export interface AwaitingInterview {
+  id: number;
+  company_name: string;
+  position: string;
+  application_date: string | null;
+  interview_stage: string;
+  days_waiting: number | null;
+}
+
+/**
+ * Interview data for past interviews that need status update/review.
+ */
+export interface NeedsReviewInterview {
+  id: number;
+  company_name: string;
+  position: string;
+  interview_date: string;
+  interview_type: string | null;
+  interview_stage: string;
+  days_ago: number;
 }
 
 /**

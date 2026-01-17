@@ -1,20 +1,23 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import type { Interview, PipelineStage } from "../types";
-import { PIPELINE_STAGE_OPTIONS } from "../types";
+import type { Interview, InterviewStage, ApplicationStatus } from "../types";
+import { INTERVIEW_STAGE_OPTIONS, APPLICATION_STATUS_OPTIONS } from "../types";
 import interviewService from "../services/interviewService";
 import type { DashboardStats } from "../services/interviewService";
 import {
   InterviewCard,
   Button,
-  StatusBadge,
+  InterviewStageBadge,
+  ApplicationStatusBadge,
   StatsCard,
   UpcomingInterviews,
+  AwaitingResponse,
+  NeedsReview,
 } from "../components";
 
 /**
  * Dashboard page - displays stats overview, upcoming interviews, and full interview list.
- * Includes pipeline stage filtering and count badges.
+ * Features dual filtering: by interview stage (where in process) and application status (outcome).
  */
 
 // Simple SVG icons for stats cards
@@ -48,7 +51,9 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isStatsLoading, setIsStatsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedStage, setSelectedStage] = useState<PipelineStage | "all">("all");
+  // Split filters for interview stage and application status
+  const [selectedInterviewStage, setSelectedInterviewStage] = useState<InterviewStage | "all">("all");
+  const [selectedAppStatus, setSelectedAppStatus] = useState<ApplicationStatus | "all">("all");
 
   // Fetch interviews and stats on mount
   useEffect(() => {
@@ -83,20 +88,35 @@ export default function Dashboard() {
     }
   };
 
-  // Calculate counts per pipeline stage
-  const stageCounts = useMemo(() => {
+  // Calculate counts per interview stage
+  const interviewStageCounts = useMemo(() => {
     const counts: Record<string, number> = { all: interviews.length };
-    PIPELINE_STAGE_OPTIONS.forEach(({ value }) => {
-      counts[value] = interviews.filter((i) => i.pipeline_stage === value).length;
+    INTERVIEW_STAGE_OPTIONS.forEach(({ value }) => {
+      counts[value] = interviews.filter((i) => i.interview_stage === value).length;
     });
     return counts;
   }, [interviews]);
 
-  // Filter interviews based on selected stage
+  // Calculate counts per application status
+  const appStatusCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: interviews.length };
+    APPLICATION_STATUS_OPTIONS.forEach(({ value }) => {
+      counts[value] = interviews.filter((i) => i.application_status === value).length;
+    });
+    return counts;
+  }, [interviews]);
+
+  // Filter interviews based on selected filters
   const filteredInterviews = useMemo(() => {
-    if (selectedStage === "all") return interviews;
-    return interviews.filter((i) => i.pipeline_stage === selectedStage);
-  }, [interviews, selectedStage]);
+    let filtered = interviews;
+    if (selectedInterviewStage !== "all") {
+      filtered = filtered.filter((i) => i.interview_stage === selectedInterviewStage);
+    }
+    if (selectedAppStatus !== "all") {
+      filtered = filtered.filter((i) => i.application_status === selectedAppStatus);
+    }
+    return filtered;
+  }, [interviews, selectedInterviewStage, selectedAppStatus]);
 
   // Navigate to edit page
   const handleEdit = (id: number) => {
@@ -191,52 +211,91 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Two Column Layout: Upcoming Interviews + Header */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        {/* Upcoming Interviews Widget */}
-        <div className="lg:col-span-1">
-          <UpcomingInterviews
-            interviews={stats?.upcoming_interviews ?? []}
+      {/* Needs Review Alert - shows at top if there are past interviews to update */}
+      {(stats?.needs_review_count ?? 0) > 0 && (
+        <div className="mb-6">
+          <NeedsReview
+            interviews={stats?.needs_review ?? []}
             isLoading={isStatsLoading}
           />
         </div>
+      )}
 
-        {/* Quick Actions + Header */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm h-full">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
-                <p className="text-sm text-gray-500">Manage your job search</p>
-              </div>
-              <Button onClick={() => navigate("/add")}>+ Add Interview</Button>
-            </div>
+      {/* Widgets Row: Upcoming + Awaiting Response */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        {/* Upcoming Interviews Widget */}
+        <UpcomingInterviews
+          interviews={stats?.upcoming_interviews ?? []}
+          isLoading={isStatsLoading}
+        />
 
-            {/* Pipeline Overview */}
-            <div className="mt-4">
-              <h3 className="text-sm font-medium text-gray-700 mb-3">Pipeline Overview</h3>
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                {PIPELINE_STAGE_OPTIONS.slice(0, 5).map(({ value, label }) => {
-                  const count = stats?.by_stage?.[value] ?? 0;
-                  return (
-                    <button
-                      key={value}
-                      onClick={() => setSelectedStage(value)}
-                      className={`p-3 rounded-lg text-center transition-all ${
-                        selectedStage === value
-                          ? "bg-indigo-100 border-2 border-indigo-300"
-                          : "bg-gray-50 border border-gray-200 hover:bg-gray-100"
-                      }`}
-                    >
-                      <StatusBadge stage={value} size="sm" />
-                      <p className="text-2xl font-bold text-gray-900 mt-1">{count}</p>
-                      <p className="text-xs text-gray-500 truncate">{label}</p>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+        {/* Awaiting Response Widget */}
+        <AwaitingResponse
+          interviews={stats?.awaiting_response ?? []}
+          isLoading={isStatsLoading}
+        />
+      </div>
+
+      {/* Quick Actions + Stage Overview */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Interview Stages</h2>
+            <p className="text-sm text-gray-500">Where you are in the interview process</p>
           </div>
+          <Button onClick={() => navigate("/add")}>+ Add Interview</Button>
+        </div>
+
+        {/* Interview Stage Buttons */}
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          {INTERVIEW_STAGE_OPTIONS.map(({ value, label }) => {
+            const count = stats?.by_interview_stage?.[value] ?? 0;
+            return (
+              <button
+                key={value}
+                onClick={() => setSelectedInterviewStage(value)}
+                className={`p-3 rounded-lg text-center transition-all ${
+                  selectedInterviewStage === value
+                    ? "bg-indigo-100 border-2 border-indigo-300"
+                    : "bg-gray-50 border border-gray-200 hover:bg-gray-100"
+                }`}
+              >
+                <InterviewStageBadge stage={value} size="sm" />
+                <p className="text-2xl font-bold text-gray-900 mt-1">{count}</p>
+                <p className="text-xs text-gray-500 truncate">{label}</p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Application Status Overview */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm mb-6">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Application Status</h2>
+          <p className="text-sm text-gray-500">Outcome of your applications</p>
+        </div>
+
+        {/* Application Status Buttons */}
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          {APPLICATION_STATUS_OPTIONS.map(({ value, label }) => {
+            const count = stats?.by_application_status?.[value] ?? 0;
+            return (
+              <button
+                key={value}
+                onClick={() => setSelectedAppStatus(value)}
+                className={`p-3 rounded-lg text-center transition-all ${
+                  selectedAppStatus === value
+                    ? "bg-indigo-100 border-2 border-indigo-300"
+                    : "bg-gray-50 border border-gray-200 hover:bg-gray-100"
+                }`}
+              >
+                <ApplicationStatusBadge status={value} size="sm" />
+                <p className="text-2xl font-bold text-gray-900 mt-1">{count}</p>
+                <p className="text-xs text-gray-500 truncate">{label}</p>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -250,37 +309,71 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Pipeline Stage Filter */}
-      <div className="mb-6">
-        <div className="flex flex-wrap gap-2">
-          {/* All filter button */}
+      {/* Quick Filters */}
+      <div className="mb-6 space-y-3">
+        {/* Interview Stage Filter */}
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-sm font-medium text-gray-700 mr-2">Stage:</span>
           <button
-            onClick={() => setSelectedStage("all")}
+            onClick={() => setSelectedInterviewStage("all")}
             className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              selectedStage === "all"
+              selectedInterviewStage === "all"
                 ? "bg-indigo-600 text-white"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
           >
-            All ({stageCounts.all})
+            All ({interviewStageCounts.all})
           </button>
-
-          {/* Stage filter buttons */}
-          {PIPELINE_STAGE_OPTIONS.map(({ value, label }) => {
-            const count = stageCounts[value] || 0;
-            const isSelected = selectedStage === value;
-
+          {INTERVIEW_STAGE_OPTIONS.map(({ value, label }) => {
+            const count = interviewStageCounts[value] || 0;
+            const isSelected = selectedInterviewStage === value;
             return (
               <button
                 key={value}
-                onClick={() => setSelectedStage(value)}
+                onClick={() => setSelectedInterviewStage(value)}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-1.5 ${
                   isSelected
                     ? "bg-indigo-600 text-white"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                {!isSelected && <StatusBadge stage={value} size="sm" />}
+                {!isSelected && <InterviewStageBadge stage={value} size="sm" />}
+                {isSelected && label}
+                <span className={isSelected ? "text-indigo-200" : "text-gray-500"}>
+                  ({count})
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Application Status Filter */}
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-sm font-medium text-gray-700 mr-2">Status:</span>
+          <button
+            onClick={() => setSelectedAppStatus("all")}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              selectedAppStatus === "all"
+                ? "bg-indigo-600 text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            All ({appStatusCounts.all})
+          </button>
+          {APPLICATION_STATUS_OPTIONS.map(({ value, label }) => {
+            const count = appStatusCounts[value] || 0;
+            const isSelected = selectedAppStatus === value;
+            return (
+              <button
+                key={value}
+                onClick={() => setSelectedAppStatus(value)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                  isSelected
+                    ? "bg-indigo-600 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                {!isSelected && <ApplicationStatusBadge status={value} size="sm" />}
                 {isSelected && label}
                 <span className={isSelected ? "text-indigo-200" : "text-gray-500"}>
                   ({count})
@@ -292,17 +385,25 @@ export default function Dashboard() {
       </div>
 
       {/* Filtered results info */}
-      {selectedStage !== "all" && (
-        <div className="mb-4 flex items-center gap-2">
+      {(selectedInterviewStage !== "all" || selectedAppStatus !== "all") && (
+        <div className="mb-4 flex items-center gap-2 flex-wrap">
           <span className="text-sm text-gray-600">
-            Showing {filteredInterviews.length} interview{filteredInterviews.length !== 1 ? "s" : ""} in
+            Showing {filteredInterviews.length} interview{filteredInterviews.length !== 1 ? "s" : ""}
           </span>
-          <StatusBadge stage={selectedStage} size="sm" />
+          {selectedInterviewStage !== "all" && (
+            <InterviewStageBadge stage={selectedInterviewStage} size="sm" />
+          )}
+          {selectedAppStatus !== "all" && (
+            <ApplicationStatusBadge status={selectedAppStatus} size="sm" />
+          )}
           <button
-            onClick={() => setSelectedStage("all")}
+            onClick={() => {
+              setSelectedInterviewStage("all");
+              setSelectedAppStatus("all");
+            }}
             className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
           >
-            Clear filter
+            Clear filters
           </button>
         </div>
       )}
@@ -321,12 +422,15 @@ export default function Dashboard() {
         </div>
       ) : (
         <div className="text-center py-8 bg-gray-50 rounded-lg">
-          <p className="text-gray-600">No interviews in this stage.</p>
+          <p className="text-gray-600">No interviews match the current filters.</p>
           <button
-            onClick={() => setSelectedStage("all")}
+            onClick={() => {
+              setSelectedInterviewStage("all");
+              setSelectedAppStatus("all");
+            }}
             className="mt-2 text-indigo-600 hover:text-indigo-800 font-medium"
           >
-            View all interviews
+            Clear filters
           </button>
         </div>
       )}

@@ -5,13 +5,14 @@ import {
   INTERVIEW_TYPE_OPTIONS,
   STATUS_OPTIONS,
   LOCATION_OPTIONS,
-  PIPELINE_STAGE_OPTIONS,
+  INTERVIEW_STAGE_OPTIONS,
+  APPLICATION_STATUS_OPTIONS,
 } from "../types";
 
 /**
  * Form component for creating/editing interviews.
  * Handles validation and submission with loading states.
- * Includes pipeline stage tracking for job application progress.
+ * Uses split fields: interview_stage (where in process) and application_status (outcome).
  */
 
 interface InterviewFormProps {
@@ -28,17 +29,25 @@ export default function InterviewForm({
   isEditing = false,
 }: InterviewFormProps) {
   // Form state - initialize with provided data or defaults
+  // interview_type, status, location are null until interview is scheduled
   const [formData, setFormData] = useState<InterviewFormData>({
     company_name: initialData?.company_name || "",
     position: initialData?.position || "",
     interview_date: initialData?.interview_date || "",
-    interview_type: initialData?.interview_type || "phone",
-    status: initialData?.status || "scheduled",
-    location: initialData?.location || "remote",
+    interview_type: initialData?.interview_type || null,
+    status: initialData?.status || null,
+    location: initialData?.location || null,
+    // New split fields
+    interview_stage: initialData?.interview_stage || "applied",
+    application_status: initialData?.application_status || "in_progress",
+    // Legacy field (kept for backwards compatibility)
     pipeline_stage: initialData?.pipeline_stage || "applied",
     application_date: initialData?.application_date || "",
     notes: initialData?.notes || "",
   });
+
+  // Check if interview date is set - determines whether to show interview-specific fields
+  const hasInterviewDate = Boolean(formData.interview_date);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -49,7 +58,29 @@ export default function InterviewForm({
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    
+    // When interview date is set, auto-populate default values for interview fields
+    if (name === "interview_date" && value && !formData.interview_date) {
+      setFormData((prev) => ({
+        ...prev,
+        interview_date: value,
+        interview_type: prev.interview_type || "phone",
+        status: prev.status || "scheduled",
+        location: prev.location || "remote",
+      }));
+    } else if (name === "interview_date" && !value) {
+      // When interview date is cleared, also clear interview-specific fields
+      setFormData((prev) => ({
+        ...prev,
+        interview_date: "",
+        interview_type: null,
+        status: null,
+        location: null,
+      }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+    
     // Clear error when field is modified
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
@@ -66,9 +97,8 @@ export default function InterviewForm({
     if (!formData.position.trim()) {
       newErrors.position = "Position is required";
     }
-    if (!formData.interview_date) {
-      newErrors.interview_date = "Interview date is required";
-    } else if (!isEditing && new Date(formData.interview_date) < new Date()) {
+    // Interview date is optional - only validate if provided
+    if (formData.interview_date && !isEditing && new Date(formData.interview_date) < new Date()) {
       newErrors.interview_date = "Interview date cannot be in the past";
     }
 
@@ -85,12 +115,17 @@ export default function InterviewForm({
 
     setIsLoading(true);
     try {
-      // Convert datetime-local format to ISO string for API
+      // Convert datetime-local format to ISO string for API, or null if not set
       const submitData = {
         ...formData,
-        interview_date: new Date(formData.interview_date).toISOString(),
-        // Convert empty string to null for optional date field
+        interview_date: formData.interview_date 
+          ? new Date(formData.interview_date).toISOString() 
+          : null,
+        // Convert empty string to null for optional fields
         application_date: formData.application_date || null,
+        interview_type: formData.interview_type || null,
+        status: formData.status || null,
+        location: formData.location || null,
       };
       await onSubmit(submitData);
     } catch (error) {
@@ -102,8 +137,13 @@ export default function InterviewForm({
     }
   };
 
-  // Pipeline stage options formatted for Select component
-  const pipelineOptions = PIPELINE_STAGE_OPTIONS.map(({ value, label }) => ({
+  // Format options for Select components
+  const interviewStageOptions = INTERVIEW_STAGE_OPTIONS.map(({ value, label }) => ({
+    value,
+    label,
+  }));
+
+  const applicationStatusOptions = APPLICATION_STATUS_OPTIONS.map(({ value, label }) => ({
     value,
     label,
   }));
@@ -139,63 +179,73 @@ export default function InterviewForm({
         />
       </div>
 
-      {/* Pipeline Stage & Application Date */}
+      {/* Interview Stage & Application Status */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Select
-          label="Pipeline Stage"
-          name="pipeline_stage"
-          value={formData.pipeline_stage}
+          label="Interview Stage"
+          name="interview_stage"
+          value={formData.interview_stage}
           onChange={handleChange}
-          options={pipelineOptions}
+          options={interviewStageOptions}
           required
         />
-        <Input
-          label="Application Date (optional)"
-          name="application_date"
-          type="date"
-          value={formData.application_date || ""}
+        <Select
+          label="Application Status"
+          name="application_status"
+          value={formData.application_status}
           onChange={handleChange}
+          options={applicationStatusOptions}
+          required
         />
       </div>
 
-      {/* Interview Date & Time */}
+      {/* Application Date */}
       <Input
-        label="Interview Date & Time"
-        name="interview_date"
-        type="datetime-local"
-        value={formData.interview_date}
+        label="Application Date (optional)"
+        name="application_date"
+        type="date"
+        value={formData.application_date || ""}
         onChange={handleChange}
-        error={errors.interview_date}
-        required
+        hint="When you submitted the application"
       />
 
-      {/* Type, Status, Location */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Select
-          label="Interview Type"
-          name="interview_type"
-          value={formData.interview_type}
-          onChange={handleChange}
-          options={INTERVIEW_TYPE_OPTIONS}
-          required
-        />
-        <Select
-          label="Appointment Status"
-          name="status"
-          value={formData.status}
-          onChange={handleChange}
-          options={STATUS_OPTIONS}
-          required
-        />
-        <Select
-          label="Location"
-          name="location"
-          value={formData.location}
-          onChange={handleChange}
-          options={LOCATION_OPTIONS}
-          required
-        />
-      </div>
+      {/* Interview Date & Time - optional for applications awaiting response */}
+      <Input
+        label="Interview Date & Time (optional)"
+        name="interview_date"
+        type="datetime-local"
+        value={formData.interview_date || ""}
+        onChange={handleChange}
+        error={errors.interview_date}
+        hint="Leave blank if no interview scheduled yet"
+      />
+
+      {/* Interview-specific fields - only shown when interview date is set */}
+      {hasInterviewDate && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-indigo-50 rounded-lg border border-indigo-100">
+          <Select
+            label="Interview Type"
+            name="interview_type"
+            value={formData.interview_type || "phone"}
+            onChange={handleChange}
+            options={INTERVIEW_TYPE_OPTIONS}
+          />
+          <Select
+            label="Appointment Status"
+            name="status"
+            value={formData.status || "scheduled"}
+            onChange={handleChange}
+            options={STATUS_OPTIONS}
+          />
+          <Select
+            label="Location"
+            name="location"
+            value={formData.location || "remote"}
+            onChange={handleChange}
+            options={LOCATION_OPTIONS}
+          />
+        </div>
+      )}
 
       {/* Notes */}
       <Textarea

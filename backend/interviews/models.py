@@ -86,8 +86,27 @@ class Interview(models.Model):
         ("hybrid", "Hybrid"),
     ]
 
-    # Pipeline stage choices - tracks overall job application progress
-    # This represents where the candidate is in the hiring pipeline
+    # Interview stage choices - where you are in the interview process
+    INTERVIEW_STAGE_CHOICES = [
+        ("applied", "Applied"),
+        ("screening", "Phone Screening"),
+        ("technical", "Technical Interview"),
+        ("onsite", "Onsite Interview"),
+        ("final", "Final Round"),
+        ("completed", "Completed"),  # Finished all interview rounds
+    ]
+
+    # Application status choices - the outcome/decision status
+    APPLICATION_STATUS_CHOICES = [
+        ("in_progress", "In Progress"),
+        ("offer", "Offer Received"),
+        ("accepted", "Accepted"),
+        ("rejected", "Rejected"),
+        ("declined", "Declined"),
+        ("withdrawn", "Withdrawn"),  # Candidate withdrew
+    ]
+
+    # DEPRECATED: Keep for backwards compatibility during migration
     PIPELINE_CHOICES = [
         ("applied", "Applied"),
         ("screening", "Phone Screening"),
@@ -112,26 +131,45 @@ class Interview(models.Model):
     # Core interview details
     company_name = models.CharField(max_length=200)
     position = models.CharField(max_length=200)
-    interview_date = models.DateTimeField()
+    # Optional - null when application submitted but no interview scheduled yet
+    interview_date = models.DateTimeField(null=True, blank=True)
 
-    # Interview metadata using choices for data consistency
+    # Interview metadata - optional until interview is scheduled
+    # These fields are only relevant once an interview date is set
     interview_type = models.CharField(
         max_length=20,
         choices=TYPE_CHOICES,
-        default="phone",
+        null=True,
+        blank=True,
     )
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
-        default="scheduled",
+        null=True,
+        blank=True,
     )
     location = models.CharField(
         max_length=20,
         choices=LOCATION_CHOICES,
-        default="remote",
+        null=True,
+        blank=True,
     )
 
-    # Pipeline tracking - where the candidate is in the overall hiring process
+    # Interview stage - where you are in the interview process
+    interview_stage = models.CharField(
+        max_length=20,
+        choices=INTERVIEW_STAGE_CHOICES,
+        default="applied",
+    )
+
+    # Application status - the outcome/decision
+    application_status = models.CharField(
+        max_length=20,
+        choices=APPLICATION_STATUS_CHOICES,
+        default="in_progress",
+    )
+
+    # DEPRECATED: Keep for backwards compatibility, will be removed after migration
     pipeline_stage = models.CharField(
         max_length=20,
         choices=PIPELINE_CHOICES,

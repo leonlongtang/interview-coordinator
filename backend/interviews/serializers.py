@@ -40,7 +40,7 @@ class InterviewSerializer(serializers.ModelSerializer):
     """
     Serializer for the Interview model.
     Converts Interview instances to/from JSON for the API.
-    Includes validation and computed fields for pipeline tracking.
+    Includes validation and computed fields for tracking.
     """
 
     # Computed read-only fields for frontend convenience
@@ -57,6 +57,10 @@ class InterviewSerializer(serializers.ModelSerializer):
             "interview_type",
             "status",
             "location",
+            # New split fields
+            "interview_stage",
+            "application_status",
+            # Legacy field (kept for backwards compatibility during transition)
             "pipeline_stage",
             "application_date",
             "notes",
@@ -81,8 +85,10 @@ class InterviewSerializer(serializers.ModelSerializer):
     def get_is_upcoming(self, obj):
         """
         Check if interview is scheduled within the next 7 days.
-        Useful for highlighting urgent interviews on the dashboard.
+        Returns False if no interview date is set.
         """
+        if not obj.interview_date:
+            return False
         now = timezone.now()
         seven_days_later = now + timedelta(days=7)
         return now <= obj.interview_date <= seven_days_later
@@ -91,7 +97,10 @@ class InterviewSerializer(serializers.ModelSerializer):
         """
         Prevent scheduling new interviews in the past.
         Only applies when creating (not updating) an interview.
+        Allows None for applications without scheduled interviews.
         """
+        if value is None:
+            return value
         # self.instance is None when creating, exists when updating
         if self.instance is None and value < timezone.now():
             raise serializers.ValidationError(

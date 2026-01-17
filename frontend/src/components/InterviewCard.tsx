@@ -1,11 +1,11 @@
 import type { Interview } from "../types";
 import { formatInterviewDate, getRelativeTime, isDatePast } from "../utils/dateUtils";
 import { Button } from "./ui";
-import StatusBadge from "./StatusBadge";
+import { InterviewStageBadge, ApplicationStatusBadge } from "./StatusBadge";
 
 /**
  * Card component displaying a single interview.
- * Shows key info at a glance with pipeline stage, edit/delete actions.
+ * Shows key info at a glance with interview stage, application status, edit/delete actions.
  */
 
 interface InterviewCardProps {
@@ -38,23 +38,33 @@ export default function InterviewCard({
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
-      {/* Header: Company & Position with Pipeline Stage */}
-      <div className="flex items-start justify-between gap-4 mb-3">
+      {/* Header: Company & Position */}
+      <div className="flex items-start justify-between gap-4 mb-2">
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-lg text-gray-900 truncate">
             {interview.company_name}
           </h3>
           <p className="text-gray-600 truncate">{interview.position}</p>
         </div>
-        <StatusBadge stage={interview.pipeline_stage} size="sm" />
       </div>
 
-      {/* Date & Time with "Upcoming" indicator */}
+      {/* Badges: Interview Stage + Application Status */}
+      <div className="flex flex-wrap gap-2 mb-3">
+        <InterviewStageBadge stage={interview.interview_stage} size="sm" />
+        <ApplicationStatusBadge status={interview.application_status} size="sm" />
+      </div>
+
+      {/* Date & Time with "Upcoming" or "Awaiting" indicator */}
       <div className={`mb-3 ${isPast && interview.status === "scheduled" ? "text-red-600" : "text-gray-700"}`}>
         <div className="flex items-center gap-2">
           <p className="font-medium">
             {formatInterviewDate(interview.interview_date)}
           </p>
+          {!interview.interview_date && (
+            <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded">
+              Awaiting
+            </span>
+          )}
           {interview.is_upcoming && interview.status === "scheduled" && (
             <span className="px-1.5 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded">
               Upcoming
@@ -73,20 +83,22 @@ export default function InterviewCard({
         </p>
       )}
 
-      {/* Tags: Type & Location */}
-      <div className="flex flex-wrap gap-2 mb-3">
-        <span
-          className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-            typeColors[interview.interview_type]
-          }`}
-        >
-          {interview.interview_type.charAt(0).toUpperCase() +
-            interview.interview_type.slice(1)}
-        </span>
-        <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-          {locationIcons[interview.location]} {interview.location.charAt(0).toUpperCase() + interview.location.slice(1)}
-        </span>
-      </div>
+      {/* Tags: Type & Location - only show if interview is scheduled */}
+      {interview.interview_type && interview.location && (
+        <div className="flex flex-wrap gap-2 mb-3">
+          <span
+            className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+              typeColors[interview.interview_type]
+            }`}
+          >
+            {interview.interview_type.charAt(0).toUpperCase() +
+              interview.interview_type.slice(1)}
+          </span>
+          <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+            {locationIcons[interview.location]} {interview.location.charAt(0).toUpperCase() + interview.location.slice(1)}
+          </span>
+        </div>
+      )}
 
       {/* Notes Preview */}
       {interview.notes && (

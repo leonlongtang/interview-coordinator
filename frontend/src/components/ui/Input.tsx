@@ -1,18 +1,20 @@
 import type { InputHTMLAttributes } from "react";
 
 /**
- * Reusable Input component with label and error handling.
+ * Reusable Input component with label, error, and hint text.
  * Provides consistent form input styling across the app.
  */
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;
   error?: string;
+  hint?: string;
 }
 
 export default function Input({
   label,
   error,
+  hint,
   className = "",
   id,
   ...props
@@ -39,6 +41,9 @@ export default function Input({
         `}
         {...props}
       />
+      {hint && !error && (
+        <span className="text-xs text-gray-500">{hint}</span>
+      )}
       {error && (
         <span className="text-sm text-red-600">{error}</span>
       )}
