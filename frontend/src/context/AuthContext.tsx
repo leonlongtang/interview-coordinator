@@ -48,6 +48,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   /**
    * Check if user is already authenticated on app load.
    * Validates existing token by fetching user info.
+   * Clears invalid tokens to prevent auth errors on public pages.
    */
   const checkAuth = useCallback(async () => {
     const token = getAccessToken();
@@ -60,7 +61,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const userData = await getCurrentUser();
       setUser(userData);
     } catch {
-      // Token invalid or expired - user needs to login again
+      // Token invalid or expired - clear tokens and reset state
+      // This prevents stale tokens from causing errors on registration/login
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
       setUser(null);
     } finally {
       setIsLoading(false);

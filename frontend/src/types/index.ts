@@ -3,6 +3,7 @@
  * Components can import from '@/types' instead of digging into services.
  */
 export type { Interview, InterviewFormData, PipelineStage } from "../services/interviewService";
+export type { UserProfile, UserProfileUpdate, TestEmailResponse } from "./profile";
 
 /**
  * Options for select dropdowns - matches Django model choices.

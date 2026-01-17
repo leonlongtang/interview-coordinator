@@ -1,5 +1,60 @@
 from django.contrib.auth.models import User
 from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+
+class UserProfile(models.Model):
+    """
+    Extended user profile for notification preferences.
+    Auto-created when a new User is registered via signal.
+    """
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="profile",
+    )
+
+    # Email notification settings
+    email_notifications_enabled = models.BooleanField(
+        default=True,
+        help_text="Receive email reminders for upcoming interviews",
+    )
+    reminder_days_before = models.PositiveIntegerField(
+        default=1,
+        help_text="Days before interview to send reminder",
+    )
+    reminder_time = models.TimeField(
+        default="09:00",
+        help_text="Preferred time to receive reminders (24h format)",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.username}'s Profile"
+
+
+@receiver(post_save, sender=User)
+def create_user_profile(sender, instance, created, **kwargs):
+    """
+    Signal handler to auto-create UserProfile when a User is created.
+    This ensures every user has notification preferences from the start.
+    """
+    if created:
+        UserProfile.objects.create(user=instance)
+
+
+@receiver(post_save, sender=User)
+def save_user_profile(sender, instance, **kwargs):
+    """
+    Signal handler to save UserProfile when User is saved.
+    Handles edge case where profile might not exist for older users.
+    """
+    if hasattr(instance, "profile"):
+        instance.profile.save()
 
 
 class Interview(models.Model):
@@ -88,6 +143,12 @@ class Interview(models.Model):
 
     # Optional notes field for additional context
     notes = models.TextField(blank=True, null=True)
+
+    # Email reminder tracking - prevents duplicate reminders
+    reminder_sent = models.BooleanField(
+        default=False,
+        help_text="Whether an email reminder has been sent for this interview",
+    )
 
     # Automatic timestamps - auto_now_add sets on creation, auto_now updates on every save
     created_at = models.DateTimeField(auto_now_add=True)

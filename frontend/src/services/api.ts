@@ -13,14 +13,22 @@ const api = axios.create({
 });
 
 /**
- * Request interceptor: Automatically attach JWT access token to all requests.
- * This ensures authenticated endpoints receive the token without manual handling.
+ * Request interceptor: Automatically attach JWT access token to requests.
+ * Skips auth endpoints (login, register, refresh) since they don't need tokens
+ * and may fail if an invalid token is present.
  */
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("access_token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    // Skip attaching token for auth endpoints
+    const isAuthEndpoint = config.url?.includes("/auth/login") ||
+                          config.url?.includes("/auth/registration") ||
+                          config.url?.includes("/auth/token/refresh");
+    
+    if (!isAuthEndpoint) {
+      const token = localStorage.getItem("access_token");
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
     return config;
   },

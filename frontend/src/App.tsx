@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { Layout, ProtectedRoute } from "./components";
-import { Dashboard, AddInterview, EditInterview, Login, Register } from "./pages";
+import { Dashboard, AddInterview, EditInterview, Login, Register, Settings } from "./pages";
 
 /**
  * Main App component with routing setup.
@@ -85,6 +85,16 @@ function AppRoutes() {
           <ProtectedRoute>
             <Layout>
               <EditInterview />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Settings />
             </Layout>
           </ProtectedRoute>
         }

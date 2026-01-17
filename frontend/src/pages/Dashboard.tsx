@@ -3,23 +3,57 @@ import { useNavigate } from "react-router-dom";
 import type { Interview, PipelineStage } from "../types";
 import { PIPELINE_STAGE_OPTIONS } from "../types";
 import interviewService from "../services/interviewService";
-import { InterviewCard, Button, StatusBadge } from "../components";
+import type { DashboardStats } from "../services/interviewService";
+import {
+  InterviewCard,
+  Button,
+  StatusBadge,
+  StatsCard,
+  UpcomingInterviews,
+} from "../components";
 
 /**
- * Dashboard page - displays all interviews in a grid.
+ * Dashboard page - displays stats overview, upcoming interviews, and full interview list.
  * Includes pipeline stage filtering and count badges.
  */
+
+// Simple SVG icons for stats cards
+const icons = {
+  total: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+    </svg>
+  ),
+  active: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+    </svg>
+  ),
+  offers: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+  rate: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+    </svg>
+  ),
+};
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const [interviews, setInterviews] = useState<Interview[]>([]);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isStatsLoading, setIsStatsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedStage, setSelectedStage] = useState<PipelineStage | "all">("all");
 
-  // Fetch interviews on mount
+  // Fetch interviews and stats on mount
   useEffect(() => {
     fetchInterviews();
+    fetchStats();
   }, []);
 
   const fetchInterviews = async () => {
@@ -33,6 +67,19 @@ export default function Dashboard() {
       console.error(err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      setIsStatsLoading(true);
+      const data = await interviewService.getDashboardStats();
+      setStats(data);
+    } catch (err) {
+      console.error("Failed to load stats:", err);
+      // Don't show error for stats - the interviews list is the main content
+    } finally {
+      setIsStatsLoading(false);
     }
   };
 
@@ -66,6 +113,8 @@ export default function Dashboard() {
       await interviewService.deleteInterview(id);
       // Remove from local state immediately for snappy UX
       setInterviews((prev) => prev.filter((i) => i.id !== id));
+      // Refresh stats after delete
+      fetchStats();
     } catch (err) {
       alert("Failed to delete interview. Please try again.");
       console.error(err);
@@ -110,20 +159,99 @@ export default function Dashboard() {
   // Main content
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      {/* Stats Section */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <StatsCard
+          title="Total Interviews"
+          value={stats?.total ?? "-"}
+          icon={icons.total}
+          color="indigo"
+          subtitle="All time"
+        />
+        <StatsCard
+          title="Active"
+          value={stats?.active ?? "-"}
+          icon={icons.active}
+          color="sky"
+          subtitle="In pipeline"
+        />
+        <StatsCard
+          title="Offers"
+          value={stats?.offers ?? "-"}
+          icon={icons.offers}
+          color="green"
+          subtitle="Received or accepted"
+        />
+        <StatsCard
+          title="Success Rate"
+          value={stats ? `${stats.success_rate}%` : "-"}
+          icon={icons.rate}
+          color="amber"
+          subtitle="Offers / completed"
+        />
+      </div>
+
+      {/* Two Column Layout: Upcoming Interviews + Header */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        {/* Upcoming Interviews Widget */}
+        <div className="lg:col-span-1">
+          <UpcomingInterviews
+            interviews={stats?.upcoming_interviews ?? []}
+            isLoading={isStatsLoading}
+          />
+        </div>
+
+        {/* Quick Actions + Header */}
+        <div className="lg:col-span-2">
+          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm h-full">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
+                <p className="text-sm text-gray-500">Manage your job search</p>
+              </div>
+              <Button onClick={() => navigate("/add")}>+ Add Interview</Button>
+            </div>
+
+            {/* Pipeline Overview */}
+            <div className="mt-4">
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Pipeline Overview</h3>
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                {PIPELINE_STAGE_OPTIONS.slice(0, 5).map(({ value, label }) => {
+                  const count = stats?.by_stage?.[value] ?? 0;
+                  return (
+                    <button
+                      key={value}
+                      onClick={() => setSelectedStage(value)}
+                      className={`p-3 rounded-lg text-center transition-all ${
+                        selectedStage === value
+                          ? "bg-indigo-100 border-2 border-indigo-300"
+                          : "bg-gray-50 border border-gray-200 hover:bg-gray-100"
+                      }`}
+                    >
+                      <StatusBadge stage={value} size="sm" />
+                      <p className="text-2xl font-bold text-gray-900 mt-1">{count}</p>
+                      <p className="text-xs text-gray-500 truncate">{label}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Interview List Header */}
+      <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Your Interviews</h2>
+          <h2 className="text-xl font-bold text-gray-900">All Interviews</h2>
           <p className="text-gray-600">
             {interviews.length} interview{interviews.length !== 1 ? "s" : ""} tracked
           </p>
         </div>
-        <Button onClick={() => navigate("/add")}>+ Add Interview</Button>
       </div>
 
       {/* Pipeline Stage Filter */}
       <div className="mb-6">
-        <h3 className="text-sm font-medium text-gray-700 mb-3">Filter by Pipeline Stage</h3>
         <div className="flex flex-wrap gap-2">
           {/* All filter button */}
           <button
@@ -205,4 +333,3 @@ export default function Dashboard() {
     </div>
   );
 }
-

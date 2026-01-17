@@ -37,6 +37,9 @@ INSTALLED_APPS = [
     "allauth.account",
     "allauth.socialaccount",  # Required even if not using social auth
 
+    # Task scheduling - Celery Beat stores periodic tasks in database
+    "django_celery_beat",
+
     # Local apps
     "interviews",
 ]
@@ -60,11 +63,11 @@ MIDDLEWARE = [
 # URLs
 ROOT_URLCONF = "config.urls"
 
-# Templates (still OK even for API-only)
+# Templates (used for email templates and admin)
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],  # Project-level templates (emails, etc.)
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -156,3 +159,40 @@ ACCOUNT_USERNAME_REQUIRED = True
 ACCOUNT_AUTHENTICATION_METHOD = "username"
 # Skip email verification for now (change to 'mandatory' in production)
 ACCOUNT_EMAIL_VERIFICATION = "optional"
+
+# =============================================================================
+# Celery Configuration (Task Queue)
+# =============================================================================
+# Redis as message broker - connects Celery workers to task queue
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://redis:6379/0")
+# Redis for storing task results (optional but useful for debugging)
+CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://redis:6379/0")
+# Only accept JSON serialized tasks (secure, no pickle)
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+# Use Django's timezone setting
+CELERY_TIMEZONE = TIME_ZONE
+# Store scheduled tasks in Django database (django-celery-beat)
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+
+# =============================================================================
+# Email Configuration (Base - override in dev.py/prod.py)
+# =============================================================================
+# Default sender for emails
+DEFAULT_FROM_EMAIL = os.environ.get(
+    "DEFAULT_FROM_EMAIL", "Interview Coordinator <noreply@example.com>"
+)
+
+# =============================================================================
+# Celery Beat Schedule (Periodic Tasks)
+# =============================================================================
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    # Check for upcoming interviews daily at 9 AM UTC
+    "check-upcoming-interviews-daily": {
+        "task": "interviews.tasks.check_upcoming_interviews",
+        "schedule": crontab(hour=9, minute=0),
+    },
+}

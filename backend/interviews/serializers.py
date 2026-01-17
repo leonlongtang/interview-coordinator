@@ -1,9 +1,39 @@
 from datetime import timedelta
 
+from django.contrib.auth.models import User
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Interview
+from .models import Interview, UserProfile
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    """
+    Serializer for UserProfile - manages notification preferences.
+    Used for the settings page where users can configure reminders.
+    """
+
+    username = serializers.CharField(source="user.username", read_only=True)
+    email = serializers.EmailField(source="user.email", read_only=True)
+
+    class Meta:
+        model = UserProfile
+        fields = [
+            "username",
+            "email",
+            "email_notifications_enabled",
+            "reminder_days_before",
+            "reminder_time",
+        ]
+        read_only_fields = ["username", "email"]
+
+    def validate_reminder_days_before(self, value):
+        """Ensure reminder days is reasonable (1-7 days)."""
+        if value < 1 or value > 7:
+            raise serializers.ValidationError(
+                "Reminder days must be between 1 and 7."
+            )
+        return value
 
 
 class InterviewSerializer(serializers.ModelSerializer):

@@ -45,6 +45,32 @@ export type InterviewFormData = Omit<
 >;
 
 /**
+ * Dashboard stats returned from the API.
+ * Provides summary metrics and upcoming interviews for the dashboard.
+ */
+export interface DashboardStats {
+  total: number;
+  active: number;
+  offers: number;
+  success_rate: number;
+  upcoming_count: number;
+  upcoming_interviews: UpcomingInterview[];
+  by_stage: Record<PipelineStage, number>;
+}
+
+/**
+ * Simplified interview data for the upcoming interviews widget.
+ */
+export interface UpcomingInterview {
+  id: number;
+  company_name: string;
+  position: string;
+  interview_date: string;
+  interview_type: string;
+  location: string;
+}
+
+/**
  * Service layer for Interview API operations.
  * Separates API logic from components for cleaner architecture.
  */
@@ -54,6 +80,14 @@ const interviewService = {
    */
   async getAllInterviews(): Promise<Interview[]> {
     const response = await api.get<Interview[]>("/interviews/");
+    return response.data;
+  },
+
+  /**
+   * Fetch dashboard statistics including counts and upcoming interviews.
+   */
+  async getDashboardStats(): Promise<DashboardStats> {
+    const response = await api.get<DashboardStats>("/interviews/dashboard-stats/");
     return response.data;
   },
 

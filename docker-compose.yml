@@ -11,6 +11,7 @@ services:
       - .env
     depends_on:
       - postgres
+      - redis
     restart: unless-stopped
 
   frontend:
@@ -35,6 +36,42 @@ services:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    restart: unless-stopped
+
+  # Redis - message broker for Celery task queue
+  redis:
+    image: redis:7-alpine
+    container_name: interview-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # Celery worker - processes background tasks (email reminders)
+  celery-worker:
+    build: ./backend
+    container_name: interview-celery-worker
+    command: celery -A config worker -l info
+    volumes:
+      - ./backend:/app
+    env_file:
+      - .env
+    depends_on:
+      - backend
+      - redis
+    restart: unless-stopped
+
+  # Celery beat - schedules periodic tasks (daily reminder checks)
+  celery-beat:
+    build: ./backend
+    container_name: interview-celery-beat
+    command: celery -A config beat -l info
+    volumes:
+      - ./backend:/app
+    env_file:
+      - .env
+    depends_on:
+      - backend
+      - redis
     restart: unless-stopped
 
 volumes:

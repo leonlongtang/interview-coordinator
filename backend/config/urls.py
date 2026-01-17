@@ -20,6 +20,8 @@ from django.http import JsonResponse
 from django.urls import include, path
 from rest_framework_simplejwt.views import TokenRefreshView
 
+from interviews.views import user_profile, send_test_reminder
+
 
 def health_check(request):
     """Simple health check endpoint for container orchestration."""
@@ -32,6 +34,14 @@ urlpatterns = [
     
     # API routes
     path("api/interviews/", include("interviews.urls")),
+    
+    # ==========================================================================
+    # User Profile / Settings endpoints
+    # ==========================================================================
+    # GET/PUT/PATCH /api/profile/ - Get or update notification preferences
+    path("api/profile/", user_profile, name="user_profile"),
+    # POST /api/profile/test-email/ - Send a test email to verify notifications
+    path("api/profile/test-email/", send_test_reminder, name="send_test_reminder"),
     
     # ==========================================================================
     # Authentication endpoints (provided by dj-rest-auth)
