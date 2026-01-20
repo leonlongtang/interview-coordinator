@@ -207,3 +207,115 @@ class Interview(models.Model):
             from django.utils import timezone
             return (timezone.now().date() - self.application_date).days
         return None
+
+    def save(self, *args, **kwargs):
+        """
+        Override save to handle auto-behaviors:
+        1. Auto-set stage to 'completed' when status becomes offer/accepted
+        2. Track previous stage for round creation
+        """
+        # Auto-complete stage when final status is set
+        if self.application_status in ["offer", "accepted"]:
+            self.interview_stage = "completed"
+
+        # Check if this is an update (has pk) and stage is changing
+        is_new = self.pk is None
+        old_stage = None
+        if not is_new:
+            try:
+                old_instance = Interview.objects.get(pk=self.pk)
+                old_stage = old_instance.interview_stage
+            except Interview.DoesNotExist:
+                pass
+
+        super().save(*args, **kwargs)
+
+        # If stage advanced, create a new round for the new stage
+        if not is_new and old_stage and old_stage != self.interview_stage:
+            # Only create round if advancing (not going to 'completed' status)
+            if self.interview_stage != "completed" and self.interview_stage != "applied":
+                InterviewRound.objects.create(
+                    interview=self,
+                    stage=self.interview_stage,
+                    outcome="pending",
+                )
+
+
+class InterviewRound(models.Model):
+    """
+    Represents a single interview round/stage in the interview process.
+    Tracks the history of each stage with notes, outcome, and timing.
+    Multiple rounds can belong to one Interview (e.g., screening → technical → onsite).
+    """
+
+    # Stage choices - matches the interview stages (excluding applied and completed)
+    STAGE_CHOICES = [
+        ("screening", "Phone Screening"),
+        ("technical", "Technical Interview"),
+        ("onsite", "Onsite Interview"),
+        ("final", "Final Round"),
+    ]
+
+    # Outcome choices for each round
+    OUTCOME_CHOICES = [
+        ("pending", "Pending"),
+        ("passed", "Passed"),
+        ("failed", "Failed"),
+        ("cancelled", "Cancelled"),
+    ]
+
+    # Link to parent interview
+    interview = models.ForeignKey(
+        Interview,
+        on_delete=models.CASCADE,
+        related_name="rounds",
+    )
+
+    # Which stage this round represents
+    stage = models.CharField(
+        max_length=20,
+        choices=STAGE_CHOICES,
+    )
+
+    # Scheduling
+    scheduled_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the interview is scheduled",
+    )
+    completed_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the interview actually happened",
+    )
+
+    # Duration in minutes (filled after interview)
+    duration_minutes = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="How long the interview lasted in minutes",
+    )
+
+    # Notes about this specific round
+    notes = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Notes about how this round went, questions asked, etc.",
+    )
+
+    # Outcome of this round
+    outcome = models.CharField(
+        max_length=20,
+        choices=OUTCOME_CHOICES,
+        default="pending",
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at"]  # Chronological order
+
+    def __str__(self):
+        return f"{self.interview.company_name} - {self.get_stage_display()} ({self.get_outcome_display()})"

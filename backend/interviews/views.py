@@ -6,8 +6,13 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import Interview, UserProfile
-from .serializers import InterviewSerializer, UserProfileSerializer
+from .models import Interview, InterviewRound, UserProfile
+from .serializers import (
+    InterviewSerializer,
+    InterviewWithRoundsSerializer,
+    InterviewRoundSerializer,
+    UserProfileSerializer,
+)
 
 
 class InterviewViewSet(viewsets.ModelViewSet):
@@ -25,16 +30,24 @@ class InterviewViewSet(viewsets.ModelViewSet):
     Security: Users can only see and modify their own interviews.
     """
 
-    serializer_class = InterviewSerializer
     # Require authentication for all operations on this viewset
     permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        """
+        Use different serializers for list vs detail views.
+        Detail view includes interview rounds history.
+        """
+        if self.action == "retrieve":
+            return InterviewWithRoundsSerializer
+        return InterviewSerializer
 
     def get_queryset(self):
         """
         Filter interviews to only return those belonging to the current user.
         This ensures users can never access other users' interviews.
         """
-        return Interview.objects.filter(user=self.request.user)
+        return Interview.objects.filter(user=self.request.user).prefetch_related("rounds")
 
     def perform_create(self, serializer):
         """
@@ -42,6 +55,38 @@ class InterviewViewSet(viewsets.ModelViewSet):
         The user doesn't need to (and can't) specify themselves - it's automatic.
         """
         serializer.save(user=self.request.user)
+
+
+class InterviewRoundViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for InterviewRound CRUD operations.
+    
+    Allows users to manage individual interview rounds (stages) for their interviews.
+    Rounds track the history of each stage with notes, outcome, and timing.
+    
+    Security: Users can only access rounds for their own interviews.
+    """
+
+    serializer_class = InterviewRoundSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Filter rounds to only return those belonging to the current user's interviews.
+        """
+        return InterviewRound.objects.filter(interview__user=self.request.user)
+
+    def perform_create(self, serializer):
+        """
+        Validate that the interview belongs to the current user before creating a round.
+        """
+        interview_id = self.request.data.get("interview")
+        try:
+            interview = Interview.objects.get(id=interview_id, user=self.request.user)
+            serializer.save()
+        except Interview.DoesNotExist:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You can only add rounds to your own interviews.")
 
 
 @api_view(["GET", "PUT", "PATCH"])

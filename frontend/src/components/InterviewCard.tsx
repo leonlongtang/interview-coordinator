@@ -37,11 +37,11 @@ export default function InterviewCard({
   const isPast = isDatePast(interview.interview_date);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-lg hover:border-indigo-200 transition-all duration-200 group">
       {/* Header: Company & Position */}
       <div className="flex items-start justify-between gap-4 mb-2">
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-lg text-gray-900 truncate">
+          <h3 className="font-semibold text-lg text-gray-900 truncate group-hover:text-indigo-700 transition-colors">
             {interview.company_name}
           </h3>
           <p className="text-gray-600 truncate">{interview.position}</p>

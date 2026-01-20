@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Interview, UserProfile
+from .models import Interview, InterviewRound, UserProfile
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -107,4 +107,53 @@ class InterviewSerializer(serializers.ModelSerializer):
                 "Interview date cannot be in the past."
             )
         return value
+
+
+class InterviewRoundSerializer(serializers.ModelSerializer):
+    """
+    Serializer for InterviewRound - tracks individual interview stages.
+    Each round represents one step in the interview process with its own
+    scheduled date, notes, and outcome.
+    """
+
+    stage_display = serializers.CharField(source="get_stage_display", read_only=True)
+    outcome_display = serializers.CharField(source="get_outcome_display", read_only=True)
+
+    class Meta:
+        model = InterviewRound
+        fields = [
+            "id",
+            "interview",
+            "stage",
+            "stage_display",
+            "scheduled_date",
+            "completed_date",
+            "duration_minutes",
+            "notes",
+            "outcome",
+            "outcome_display",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at", "stage_display", "outcome_display"]
+
+    def validate_duration_minutes(self, value):
+        """Ensure duration is reasonable (1-480 minutes / 8 hours max)."""
+        if value is not None and (value < 1 or value > 480):
+            raise serializers.ValidationError(
+                "Duration must be between 1 and 480 minutes."
+            )
+        return value
+
+
+class InterviewWithRoundsSerializer(InterviewSerializer):
+    """
+    Extended Interview serializer that includes all interview rounds.
+    Used for detailed view of an interview with full history.
+    """
+
+    rounds = InterviewRoundSerializer(many=True, read_only=True)
+
+    class Meta(InterviewSerializer.Meta):
+        fields = InterviewSerializer.Meta.fields + ["rounds"]
 

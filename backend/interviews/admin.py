@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 
-from .models import Interview, UserProfile
+from .models import Interview, InterviewRound, UserProfile
 
 
 class UserProfileInline(admin.StackedInline):
@@ -41,6 +41,16 @@ class UserProfileAdmin(admin.ModelAdmin):
     search_fields = ["user__username", "user__email"]
 
 
+class InterviewRoundInline(admin.TabularInline):
+    """
+    Inline admin for InterviewRound - shows rounds on Interview edit page.
+    """
+    model = InterviewRound
+    extra = 0  # Don't show empty forms by default
+    readonly_fields = ["created_at"]
+    fields = ["stage", "scheduled_date", "completed_date", "duration_minutes", "outcome", "notes", "created_at"]
+
+
 @admin.register(Interview)
 class InterviewAdmin(admin.ModelAdmin):
     """
@@ -53,7 +63,8 @@ class InterviewAdmin(admin.ModelAdmin):
         "company_name",
         "position",
         "interview_date",
-        "pipeline_stage",
+        "interview_stage",
+        "application_status",
         "status",
         "interview_type",
         "location",
@@ -61,7 +72,7 @@ class InterviewAdmin(admin.ModelAdmin):
     ]
 
     # Sidebar filters for quick filtering
-    list_filter = ["status", "pipeline_stage", "interview_type", "location", "reminder_sent"]
+    list_filter = ["status", "interview_stage", "application_status", "interview_type", "location", "reminder_sent"]
 
     # Fields that can be searched via the search box
     search_fields = ["company_name", "position"]
@@ -75,11 +86,32 @@ class InterviewAdmin(admin.ModelAdmin):
     # Groups fields in the edit form for better organization
     fieldsets = [
         ("Interview Details", {"fields": ["user", "company_name", "position", "interview_date"]}),
-        ("Pipeline", {"fields": ["pipeline_stage", "application_date"]}),
+        ("Pipeline", {"fields": ["interview_stage", "application_status", "application_date"]}),
         ("Classification", {"fields": ["interview_type", "status", "location"]}),
         ("Notifications", {"fields": ["reminder_sent"]}),
         ("Additional Info", {"fields": ["notes"], "classes": ["collapse"]}),
     ]
 
     # Makes the list view editable for quick status updates
-    list_editable = ["status", "pipeline_stage"]
+    list_editable = ["status", "interview_stage", "application_status"]
+
+    # Show interview rounds inline
+    inlines = [InterviewRoundInline]
+
+
+@admin.register(InterviewRound)
+class InterviewRoundAdmin(admin.ModelAdmin):
+    """
+    Admin for InterviewRound - manage individual interview stages.
+    """
+    list_display = [
+        "interview",
+        "stage",
+        "scheduled_date",
+        "outcome",
+        "duration_minutes",
+        "created_at",
+    ]
+    list_filter = ["stage", "outcome"]
+    search_fields = ["interview__company_name", "interview__position"]
+    ordering = ["-scheduled_date"]

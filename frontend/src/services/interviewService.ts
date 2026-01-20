@@ -130,6 +130,49 @@ export interface NeedsReviewInterview {
 }
 
 /**
+ * Round stage type - the interview stages that can have rounds.
+ */
+export type RoundStage = "screening" | "technical" | "onsite" | "final";
+
+/**
+ * Round outcome type - the result of a single interview round.
+ */
+export type RoundOutcome = "pending" | "passed" | "failed" | "cancelled";
+
+/**
+ * Interview round data structure - tracks individual interview stages.
+ */
+export interface InterviewRound {
+  id: number;
+  interview: number;
+  stage: RoundStage;
+  stage_display: string;
+  scheduled_date: string | null;
+  completed_date: string | null;
+  duration_minutes: number | null;
+  notes: string | null;
+  outcome: RoundOutcome;
+  outcome_display: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Data required to create or update an interview round.
+ */
+export type InterviewRoundFormData = Omit<
+  InterviewRound,
+  "id" | "stage_display" | "outcome_display" | "created_at" | "updated_at"
+>;
+
+/**
+ * Interview with rounds - extended interview data including history.
+ */
+export interface InterviewWithRounds extends Interview {
+  rounds: InterviewRound[];
+}
+
+/**
  * Service layer for Interview API operations.
  * Separates API logic from components for cleaner architecture.
  */
@@ -151,10 +194,10 @@ const interviewService = {
   },
 
   /**
-   * Fetch a single interview by ID.
+   * Fetch a single interview by ID (includes rounds history).
    */
-  async getInterview(id: number): Promise<Interview> {
-    const response = await api.get<Interview>(`/interviews/${id}/`);
+  async getInterview(id: number): Promise<InterviewWithRounds> {
+    const response = await api.get<InterviewWithRounds>(`/interviews/${id}/`);
     return response.data;
   },
 
@@ -179,6 +222,39 @@ const interviewService = {
    */
   async deleteInterview(id: number): Promise<void> {
     await api.delete(`/interviews/${id}/`);
+  },
+
+  // ==================== Interview Rounds ====================
+
+  /**
+   * Fetch all rounds for an interview.
+   */
+  async getRounds(interviewId: number): Promise<InterviewRound[]> {
+    const response = await api.get<InterviewRound[]>(`/interviews/rounds/?interview=${interviewId}`);
+    return response.data;
+  },
+
+  /**
+   * Create a new interview round.
+   */
+  async createRound(data: InterviewRoundFormData): Promise<InterviewRound> {
+    const response = await api.post<InterviewRound>("/interviews/rounds/", data);
+    return response.data;
+  },
+
+  /**
+   * Update an existing interview round.
+   */
+  async updateRound(id: number, data: Partial<InterviewRoundFormData>): Promise<InterviewRound> {
+    const response = await api.patch<InterviewRound>(`/interviews/rounds/${id}/`, data);
+    return response.data;
+  },
+
+  /**
+   * Delete an interview round.
+   */
+  async deleteRound(id: number): Promise<void> {
+    await api.delete(`/interviews/rounds/${id}/`);
   },
 };
 

@@ -13,6 +13,10 @@ import {
   UpcomingInterviews,
   AwaitingResponse,
   NeedsReview,
+  LoadingSkeleton,
+  EmptyState,
+  ErrorMessage,
+  ConfirmDialog,
 } from "../components";
 
 /**
@@ -54,6 +58,10 @@ export default function Dashboard() {
   // Split filters for interview stage and application status
   const [selectedInterviewStage, setSelectedInterviewStage] = useState<InterviewStage | "all">("all");
   const [selectedAppStatus, setSelectedAppStatus] = useState<ApplicationStatus | "all">("all");
+  // Delete confirmation dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [interviewToDelete, setInterviewToDelete] = useState<Interview | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch interviews and stats on mount
   useEffect(() => {
@@ -123,39 +131,75 @@ export default function Dashboard() {
     navigate(`/edit/${id}`);
   };
 
-  // Delete with confirmation
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("Are you sure you want to delete this interview?")) {
-      return;
-    }
-
-    try {
-      await interviewService.deleteInterview(id);
-      // Remove from local state immediately for snappy UX
-      setInterviews((prev) => prev.filter((i) => i.id !== id));
-      // Refresh stats after delete
-      fetchStats();
-    } catch (err) {
-      alert("Failed to delete interview. Please try again.");
-      console.error(err);
+  // Open delete confirmation dialog
+  const handleDelete = (id: number) => {
+    const interview = interviews.find((i) => i.id === id);
+    if (interview) {
+      setInterviewToDelete(interview);
+      setDeleteDialogOpen(true);
     }
   };
 
-  // Loading state
+  // Confirm delete action
+  const confirmDelete = async () => {
+    if (!interviewToDelete) return;
+
+    try {
+      setIsDeleting(true);
+      await interviewService.deleteInterview(interviewToDelete.id);
+      // Remove from local state immediately for snappy UX
+      setInterviews((prev) => prev.filter((i) => i.id !== interviewToDelete.id));
+      // Refresh stats after delete
+      fetchStats();
+      setDeleteDialogOpen(false);
+      setInterviewToDelete(null);
+    } catch (err) {
+      setError("Failed to delete interview. Please try again.");
+      console.error(err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Cancel delete action
+  const cancelDelete = () => {
+    setDeleteDialogOpen(false);
+    setInterviewToDelete(null);
+  };
+
+  // Loading state with skeleton
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      <div className="space-y-6 animate-fade-in">
+        {/* Stats skeleton */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-200 p-5">
+              <LoadingSkeleton variant="text" className="w-1/2 mb-2" />
+              <LoadingSkeleton variant="text" className="w-1/4 h-8" />
+            </div>
+          ))}
+        </div>
+        {/* Cards skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <LoadingSkeleton variant="card" count={3} />
+        </div>
       </div>
     );
   }
 
   // Error state
-  if (error) {
+  if (error && interviews.length === 0) {
     return (
-      <div className="text-center py-12">
-        <p className="text-red-600 mb-4">{error}</p>
-        <Button onClick={fetchInterviews}>Try Again</Button>
+      <div className="py-12">
+        <ErrorMessage
+          message={error}
+          onDismiss={() => setError(null)}
+          className="mb-6"
+        />
+        <div className="text-center">
+          <Button onClick={fetchInterviews}>Try Again</Button>
+        </div>
       </div>
     );
   }
@@ -163,16 +207,15 @@ export default function Dashboard() {
   // Empty state
   if (interviews.length === 0) {
     return (
-      <div className="text-center py-12">
-        <div className="text-6xl mb-4">📅</div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">
-          No interviews yet
-        </h2>
-        <p className="text-gray-600 mb-6">
-          Start tracking your job interviews by adding your first one.
-        </p>
-        <Button onClick={() => navigate("/add")}>Add Your First Interview</Button>
-      </div>
+      <EmptyState
+        icon="📅"
+        title="No interviews yet"
+        message="Start tracking your job interviews by adding your first one."
+        action={{
+          label: "Add Your First Interview",
+          onClick: () => navigate("/add"),
+        }}
+      />
     );
   }
 
@@ -408,32 +451,56 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Error message if delete failed */}
+      {error && (
+        <ErrorMessage
+          message={error}
+          onDismiss={() => setError(null)}
+          className="mb-4"
+        />
+      )}
+
       {/* Interview Grid */}
       {filteredInterviews.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredInterviews.map((interview) => (
-            <InterviewCard
-              key={interview.id}
-              interview={interview}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
+            <div key={interview.id} className="animate-slide-up">
+              <InterviewCard
+                interview={interview}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
+            </div>
           ))}
         </div>
       ) : (
-        <div className="text-center py-8 bg-gray-50 rounded-lg">
-          <p className="text-gray-600">No interviews match the current filters.</p>
-          <button
-            onClick={() => {
+        <EmptyState
+          icon="🔍"
+          title="No interviews match the current filters"
+          message="Try adjusting your filters to see more results."
+          action={{
+            label: "Clear filters",
+            onClick: () => {
               setSelectedInterviewStage("all");
               setSelectedAppStatus("all");
-            }}
-            className="mt-2 text-indigo-600 hover:text-indigo-800 font-medium"
-          >
-            Clear filters
-          </button>
-        </div>
+            },
+          }}
+          className="bg-gray-50 rounded-lg"
+        />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteDialogOpen}
+        title="Delete Interview"
+        message={`Are you sure you want to delete the interview at ${interviewToDelete?.company_name} for ${interviewToDelete?.position}? This action cannot be undone.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

@@ -3,6 +3,7 @@
  */
 export { default as Layout } from "./Layout";
 export { default as InterviewCard } from "./InterviewCard";
+export { default as InterviewRounds } from "./InterviewRounds";
 export { default as ProtectedRoute } from "./ProtectedRoute";
 export { default as StatusBadge, InterviewStageBadge, ApplicationStatusBadge } from "./StatusBadge";
 export { default as StatsCard } from "./StatsCard";

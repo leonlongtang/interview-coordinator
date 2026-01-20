@@ -1,3 +1,0 @@
-nice 
-ok so for the pipeline stage i was thinking maybe we split it into interview stage and acceptance status or smth you can name it 
-what do you think ?

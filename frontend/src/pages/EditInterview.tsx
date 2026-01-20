@@ -2,19 +2,20 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import InterviewForm from "../components/InterviewForm";
 import interviewService from "../services/interviewService";
-import type { Interview, InterviewFormData } from "../types";
+import type { InterviewFormData, InterviewWithRounds, InterviewRound } from "../types";
 import { formatForInput } from "../utils/dateUtils";
-import { Button } from "../components";
+import { Button, InterviewRounds } from "../components";
 
 /**
  * Page for editing an existing interview.
  * Fetches interview data and pre-populates the form.
+ * Also displays interview rounds history.
  */
 
 export default function EditInterview() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const [interview, setInterview] = useState<Interview | null>(null);
+  const [interview, setInterview] = useState<InterviewWithRounds | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,12 +40,22 @@ export default function EditInterview() {
 
   const handleSubmit = async (data: InterviewFormData) => {
     if (!id) return;
-    await interviewService.updateInterview(Number(id), data);
+    const updated = await interviewService.updateInterview(Number(id), data);
+    // Refetch to get updated rounds (in case stage change created a new round)
+    const refreshed = await interviewService.getInterview(Number(id));
+    setInterview(refreshed);
     navigate("/"); // Go back to dashboard on success
   };
 
   const handleCancel = () => {
     navigate("/");
+  };
+
+  // Handle rounds updates from InterviewRounds component
+  const handleRoundsChange = (rounds: InterviewRound[]) => {
+    if (interview) {
+      setInterview({ ...interview, rounds });
+    }
   };
 
   // Loading state
@@ -79,14 +90,33 @@ export default function EditInterview() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Edit Interview</h2>
+    <div className="max-w-3xl mx-auto space-y-6">
+      {/* Header */}
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Edit Interview</h2>
+        <p className="text-gray-600">
+          {interview.company_name} - {interview.position}
+        </p>
+      </div>
+
+      {/* Interview Details Form */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Interview Details</h3>
         <InterviewForm
           initialData={initialData}
           onSubmit={handleSubmit}
           onCancel={handleCancel}
           isEditing
+        />
+      </div>
+
+      {/* Interview Rounds History */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <InterviewRounds
+          interviewId={interview.id}
+          rounds={interview.rounds || []}
+          onRoundsChange={handleRoundsChange}
+          currentStage={interview.interview_stage}
         />
       </div>
     </div>
