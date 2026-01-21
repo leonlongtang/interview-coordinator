@@ -1,73 +1,87 @@
-# React + TypeScript + Vite
+# Interview Coordinator - Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + TypeScript frontend for the Interview Coordinator application.
 
-Currently, two official plugins are available:
+## Tech Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Framework**: React 18 + TypeScript
+- **Build Tool**: Vite
+- **Styling**: Tailwind CSS
+- **HTTP Client**: Axios
+- **Routing**: React Router DOM
 
-## React Compiler
+## Project Structure
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+frontend/src/
+├── components/           # Reusable UI components
+│   ├── ui/              # Base UI components (Button, Input, etc.)
+│   ├── InterviewCard.tsx
+│   ├── InterviewForm.tsx
+│   ├── InterviewRounds.tsx
+│   ├── Layout.tsx
+│   └── ...
+├── pages/               # Page components
+│   ├── Dashboard.tsx
+│   ├── AddInterview.tsx
+│   ├── EditInterview.tsx
+│   ├── Login.tsx
+│   ├── Register.tsx
+│   └── Settings.tsx
+├── services/            # API services
+│   ├── api.ts          # Axios instance with interceptors
+│   ├── authService.ts  # Authentication API calls
+│   ├── interviewService.ts
+│   └── profileService.ts
+├── context/             # React context providers
+│   └── AuthContext.tsx # Authentication state management
+├── types/               # TypeScript type definitions
+├── utils/               # Utility functions
+│   ├── dateUtils.ts
+│   └── security.ts     # Input sanitization
+└── App.tsx             # Main app with routing
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Features
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- **Authentication**: JWT-based login/register with automatic token refresh
+- **Dashboard**: Statistics, upcoming interviews, needs review widgets
+- **Interview Management**: Full CRUD with interview rounds history
+- **Settings**: Notification preferences
+- **Security**: Input sanitization, XSS prevention
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Authentication Flow
+
+1. User logs in via `/api/auth/login/`
+2. JWT tokens stored in localStorage
+3. Axios interceptor adds Bearer token to requests
+4. On 401 error, interceptor attempts token refresh
+5. If refresh fails, user redirected to login
+
+## Development
+
+```bash
+npm install
+npm run dev
 ```
+
+App runs at http://localhost:5173
+
+## Environment
+
+The frontend connects to the backend API at `http://localhost:8000/api`.
+To change this, update `baseURL` in `src/services/api.ts`.
+
+## Build
+
+```bash
+npm run build
+npm run preview  # Preview production build
+```
+
+## Security
+
+- All user inputs are sanitized before submission
+- Script injection is blocked in form fields
+- Tokens are cleared from all storage on logout
+- No sensitive data logged to console in production
