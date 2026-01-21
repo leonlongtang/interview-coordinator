@@ -25,3 +25,44 @@ if EMAIL_HOST and EMAIL_HOST_USER:
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 else:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+# =============================================================================
+# Logging Configuration (Development)
+# =============================================================================
+# Log security events to console in development
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {message}",
+            "style": "{",
+        },
+        "security": {
+            "format": "[SECURITY] {levelname} {asctime} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+        "security_console": {
+            "class": "logging.StreamHandler",
+            "formatter": "security",
+        },
+    },
+    "loggers": {
+        "django.security": {
+            "handlers": ["security_console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "interviews.security": {
+            "handlers": ["security_console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}

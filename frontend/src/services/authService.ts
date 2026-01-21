@@ -40,10 +40,27 @@ export function getRefreshToken(): string | null {
 
 /**
  * Clear all auth tokens from storage (used on logout).
+ * Also clears any other auth-related data from storage.
  */
 export function clearTokens(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(REFRESH_KEY);
+  
+  // Clear any other auth-related data that might be stored
+  // This ensures complete cleanup on logout
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(REFRESH_KEY);
+}
+
+/**
+ * Clear all authentication data from all storage mechanisms.
+ * Use this for complete security cleanup (e.g., on security events).
+ */
+export function clearAllAuthData(): void {
+  clearTokens();
+  
+  // Clear any cached user data
+  // Note: If you add user caching in the future, clear it here
 }
 
 /**
@@ -145,5 +162,6 @@ export default {
   getRefreshToken,
   setTokens,
   clearTokens,
+  clearAllAuthData,
 };
 

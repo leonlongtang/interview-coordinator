@@ -1,3 +1,4 @@
+import re
 from datetime import timedelta
 
 from django.contrib.auth.models import User
@@ -5,6 +6,51 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from .models import Interview, InterviewRound, UserProfile
+
+
+# =============================================================================
+# Input Sanitization Utilities
+# =============================================================================
+
+def sanitize_text(value: str, max_length: int = None) -> str:
+    """
+    Sanitize text input to prevent XSS and injection attacks.
+    
+    - Strips leading/trailing whitespace
+    - Removes null bytes and control characters
+    - Truncates to max_length if specified
+    """
+    if not value:
+        return value
+    
+    # Remove null bytes and control characters (except newlines/tabs)
+    value = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', value)
+    
+    # Strip whitespace
+    value = value.strip()
+    
+    # Truncate if needed
+    if max_length and len(value) > max_length:
+        value = value[:max_length]
+    
+    return value
+
+
+def validate_no_html(value: str) -> str:
+    """
+    Validate that input doesn't contain HTML tags.
+    Prevents basic XSS attempts in text fields.
+    """
+    if not value:
+        return value
+    
+    # Check for HTML-like patterns
+    if re.search(r'<[^>]+>', value):
+        raise serializers.ValidationError(
+            "HTML tags are not allowed in this field."
+        )
+    
+    return value
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -108,6 +154,44 @@ class InterviewSerializer(serializers.ModelSerializer):
             )
         return value
 
+    def validate_company_name(self, value):
+        """Sanitize and validate company name."""
+        value = sanitize_text(value, max_length=200)
+        value = validate_no_html(value)
+        if len(value) < 2:
+            raise serializers.ValidationError(
+                "Company name must be at least 2 characters."
+            )
+        return value
+
+    def validate_position(self, value):
+        """Sanitize and validate position title."""
+        value = sanitize_text(value, max_length=200)
+        value = validate_no_html(value)
+        if len(value) < 2:
+            raise serializers.ValidationError(
+                "Position must be at least 2 characters."
+            )
+        return value
+
+    def validate_location(self, value):
+        """Sanitize location field."""
+        if value:
+            value = sanitize_text(value, max_length=200)
+            value = validate_no_html(value)
+        return value
+
+    def validate_notes(self, value):
+        """Sanitize notes field - allows longer text but still sanitized."""
+        if value:
+            value = sanitize_text(value, max_length=5000)
+            # Notes can contain some formatting, just check for script tags
+            if re.search(r'<script', value, re.IGNORECASE):
+                raise serializers.ValidationError(
+                    "Script tags are not allowed."
+                )
+        return value
+
 
 class InterviewRoundSerializer(serializers.ModelSerializer):
     """
@@ -143,6 +227,16 @@ class InterviewRoundSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Duration must be between 1 and 480 minutes."
             )
+        return value
+
+    def validate_notes(self, value):
+        """Sanitize notes field."""
+        if value:
+            value = sanitize_text(value, max_length=5000)
+            if re.search(r'<script', value, re.IGNORECASE):
+                raise serializers.ValidationError(
+                    "Script tags are not allowed."
+                )
         return value
 
 

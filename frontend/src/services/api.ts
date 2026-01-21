@@ -96,9 +96,12 @@ api.interceptors.response.use(
 
       if (!refreshToken) {
         // No refresh token - user needs to login
+        // Clear all auth data for security
         isRefreshing = false;
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
+        sessionStorage.removeItem("access_token");
+        sessionStorage.removeItem("refresh_token");
         window.location.href = "/login";
         return Promise.reject(error);
       }
@@ -124,10 +127,12 @@ api.interceptors.response.use(
 
         return api(originalRequest);
       } catch (refreshError) {
-        // Refresh failed - clear tokens and redirect to login
+        // Refresh failed - clear all auth data and redirect to login
         processQueue(refreshError, null);
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
+        sessionStorage.removeItem("access_token");
+        sessionStorage.removeItem("refresh_token");
         window.location.href = "/login";
         return Promise.reject(refreshError);
       } finally {

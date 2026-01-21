@@ -18,9 +18,16 @@ Including another URLconf
 from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path
-from rest_framework_simplejwt.views import TokenRefreshView
 
 from interviews.views import user_profile, send_test_reminder
+from interviews.auth_views import (
+    RateLimitedLoginView,
+    RateLimitedRegisterView,
+    RateLimitedLogoutView,
+    RateLimitedPasswordChangeView,
+    RateLimitedPasswordResetView,
+    RateLimitedTokenRefreshView,
+)
 
 
 def health_check(request):
@@ -44,19 +51,30 @@ urlpatterns = [
     path("api/profile/test-email/", send_test_reminder, name="send_test_reminder"),
     
     # ==========================================================================
-    # Authentication endpoints (provided by dj-rest-auth)
+    # Authentication endpoints with rate limiting
     # ==========================================================================
-    # POST /api/auth/login/     - Login with username/password, returns JWT tokens
-    # POST /api/auth/logout/    - Logout (blacklists refresh token)
-    # POST /api/auth/password/reset/ - Request password reset email
+    # These custom views wrap dj-rest-auth with:
+    # - Strict rate limiting (5 attempts/minute) to prevent brute force
+    # - Security logging for audit trails
+    
+    # POST /api/auth/login/ - Login with username/password, returns JWT tokens
+    path("api/auth/login/", RateLimitedLoginView.as_view(), name="rest_login"),
+    # POST /api/auth/logout/ - Logout (blacklists refresh token)
+    path("api/auth/logout/", RateLimitedLogoutView.as_view(), name="rest_logout"),
     # POST /api/auth/password/change/ - Change password (authenticated)
-    # GET  /api/auth/user/      - Get current user details
+    path("api/auth/password/change/", RateLimitedPasswordChangeView.as_view(), name="rest_password_change"),
+    # POST /api/auth/password/reset/ - Request password reset email
+    path("api/auth/password/reset/", RateLimitedPasswordResetView.as_view(), name="rest_password_reset"),
+    
+    # Include remaining dj-rest-auth URLs (user details, etc.)
+    # GET /api/auth/user/ - Get current user details
     path("api/auth/", include("dj_rest_auth.urls")),
     
-    # POST /api/auth/registration/ - Register new user
-    # POST /api/auth/registration/verify-email/ - Verify email address
+    # POST /api/auth/registration/ - Register new user (rate limited)
+    path("api/auth/registration/", RateLimitedRegisterView.as_view(), name="rest_register"),
+    # Include remaining registration URLs (verify-email, etc.)
     path("api/auth/registration/", include("dj_rest_auth.registration.urls")),
     
     # POST /api/auth/token/refresh/ - Get new access token using refresh token
-    path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("api/auth/token/refresh/", RateLimitedTokenRefreshView.as_view(), name="token_refresh"),
 ]

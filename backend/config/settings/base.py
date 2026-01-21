@@ -107,6 +107,31 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # =============================================================================
+# Password Validation - Enforce strong passwords
+# =============================================================================
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        # Prevents passwords too similar to user attributes (username, email)
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+    },
+    {
+        # Minimum length requirement
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {
+            "min_length": 8,
+        },
+    },
+    {
+        # Blocks common passwords (e.g., "password123", "qwerty")
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
+    },
+    {
+        # Prevents all-numeric passwords
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
+    },
+]
+
+# =============================================================================
 # Django REST Framework Configuration
 # =============================================================================
 REST_FRAMEWORK = {
@@ -119,6 +144,16 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    # Rate limiting (throttling) to prevent abuse
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/hour",  # Anonymous users: 100 requests per hour
+        "user": "1000/hour",  # Authenticated users: 1000 requests per hour
+        "auth": "5/minute",  # Auth endpoints: 5 attempts per minute (stricter)
+    },
 }
 
 # =============================================================================

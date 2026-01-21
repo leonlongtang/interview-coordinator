@@ -8,6 +8,7 @@ import {
   INTERVIEW_STAGE_OPTIONS,
   APPLICATION_STATUS_OPTIONS,
 } from "../types";
+import { sanitizeInput, containsScript } from "../utils/security";
 
 /**
  * Form component for creating/editing interviews.
@@ -91,12 +92,27 @@ export default function InterviewForm({
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.company_name.trim()) {
+    // Sanitize and validate company name
+    const sanitizedCompany = sanitizeInput(formData.company_name, 200);
+    if (!sanitizedCompany.trim()) {
       newErrors.company_name = "Company name is required";
+    } else if (containsScript(sanitizedCompany)) {
+      newErrors.company_name = "Invalid characters in company name";
     }
-    if (!formData.position.trim()) {
+
+    // Sanitize and validate position
+    const sanitizedPosition = sanitizeInput(formData.position, 200);
+    if (!sanitizedPosition.trim()) {
       newErrors.position = "Position is required";
+    } else if (containsScript(sanitizedPosition)) {
+      newErrors.position = "Invalid characters in position";
     }
+
+    // Validate notes if provided
+    if (formData.notes && containsScript(formData.notes)) {
+      newErrors.notes = "Invalid content in notes";
+    }
+
     // Interview date is optional - only validate if provided
     if (formData.interview_date && !isEditing && new Date(formData.interview_date) < new Date()) {
       newErrors.interview_date = "Interview date cannot be in the past";
@@ -115,9 +131,14 @@ export default function InterviewForm({
 
     setIsLoading(true);
     try {
-      // Convert datetime-local format to ISO string for API, or null if not set
+      // Sanitize all text inputs before submission
       const submitData = {
         ...formData,
+        // Sanitize text fields
+        company_name: sanitizeInput(formData.company_name, 200),
+        position: sanitizeInput(formData.position, 200),
+        notes: formData.notes ? sanitizeInput(formData.notes, 5000) : "",
+        // Convert datetime-local format to ISO string for API, or null if not set
         interview_date: formData.interview_date 
           ? new Date(formData.interview_date).toISOString() 
           : null,
