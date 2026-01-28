@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ['postgresql']
+
+[phases.install]
+cmds = ['pip install -r requirements/prod.txt']
+
+[start]
+cmd = 'gunicorn config.wsgi:application'
