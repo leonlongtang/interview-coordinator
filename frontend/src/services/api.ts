@@ -1,12 +1,18 @@
 import axios from "axios";
 
 /**
+ * Backend API base URL. Vite inlines VITE_API_URL at build time;
+ * fallback to localhost for local dev. No trailing slash.
+ */
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+/**
  * Axios instance configured for our Django backend API.
  * Centralizes API configuration so all requests use the same base URL and headers.
  * Includes JWT token handling via interceptors.
  */
 const api = axios.create({
-  baseURL: "http://localhost:8000/api",
+  baseURL: `${API_BASE}/api`,
   headers: {
     "Content-Type": "application/json",
   },
@@ -107,9 +113,9 @@ api.interceptors.response.use(
       }
 
       try {
-        // Attempt to refresh the access token
+        // Attempt to refresh the access token (use same base as api instance)
         const response = await axios.post(
-          "http://localhost:8000/api/auth/token/refresh/",
+          `${API_BASE}/api/auth/token/refresh/`,
           { refresh: refreshToken }
         );
 

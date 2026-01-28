@@ -1,5 +1,11 @@
 -r base.txt
 
+# WSGI server (Docker dev uses gunicorn; runserver can give "empty reply" in containers)
+gunicorn>=22.0,<23.0
+
+# Static files (base middleware uses WhiteNoise; required for gunicorn/runserver)
+whitenoise>=6.6,<7.0
+
 # Debugging
 django-debug-toolbar>=4.3,<5.0
 

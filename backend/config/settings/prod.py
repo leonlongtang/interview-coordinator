@@ -17,11 +17,11 @@ DATABASES = {
 }
 
 # =============================================================================
-# CORS Configuration - Allow your frontend domain
+# CORS Configuration - Allow your frontend domain(s)
+# Comma-separated FRONTEND_URL supports multiple origins (e.g. preview + prod).
 # =============================================================================
-CORS_ALLOWED_ORIGINS = [
-    os.environ.get('FRONTEND_URL', 'http://localhost:5173'),
-]
+_raw = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+CORS_ALLOWED_ORIGINS = [o.strip() for o in _raw.split(",") if o.strip()]
 
 # =============================================================================
 # Celery Configuration - Use Railway's Redis

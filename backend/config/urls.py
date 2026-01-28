@@ -16,7 +16,7 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.http import JsonResponse
+from django.http import HttpResponse
 from django.urls import include, path
 
 from interviews.views import user_profile, send_test_reminder
@@ -31,8 +31,8 @@ from interviews.auth_views import (
 
 
 def health_check(request):
-    """Simple health check endpoint for container orchestration."""
-    return JsonResponse({"status": "ok"})
+    """Minimal health check for orchestration; HttpResponse avoids JsonResponse quirks with runserver."""
+    return HttpResponse('{"status":"ok"}', content_type="application/json", status=200)
 
 
 urlpatterns = [
