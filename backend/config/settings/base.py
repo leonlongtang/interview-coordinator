@@ -193,7 +193,8 @@ ACCOUNT_USERNAME_REQUIRED = True
 # Users log in with username (alternatives: 'email' or 'username_email')
 ACCOUNT_AUTHENTICATION_METHOD = "username"
 # Skip email verification for now (change to 'mandatory' in production)
-ACCOUNT_EMAIL_VERIFICATION = "optional"
+# Options: 'none', 'optional', 'mandatory'
+ACCOUNT_EMAIL_VERIFICATION = "none"
 
 # =============================================================================
 # Celery Configuration (Task Queue)

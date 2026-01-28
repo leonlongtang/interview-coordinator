@@ -83,7 +83,8 @@ class InterviewRoundViewSet(viewsets.ModelViewSet):
         interview_id = self.request.data.get("interview")
         try:
             interview = Interview.objects.get(id=interview_id, user=self.request.user)
-            serializer.save()
+            # Pass the validated interview to the serializer
+            serializer.save(interview=interview)
         except Interview.DoesNotExist:
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("You can only add rounds to your own interviews.")
