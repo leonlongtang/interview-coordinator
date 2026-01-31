@@ -1,4 +1,4 @@
-📅 Interview Coordinator - Upcoming Interview Reminder
+Interview Coordinator - Upcoming Interview Reminder
 ======================================================
 
 Hi {{ user.username }},
@@ -7,27 +7,27 @@ You have an interview {{ time_until }}!
 
 INTERVIEW DETAILS
 -----------------
-Company:  {{ interview.company_name }}
-Position: {{ interview.position }}
-Date:     {{ interview.interview_date|date:"l, F j, Y" }}
-Time:     {{ interview.interview_date|time:"g:i A" }}
-Location: {{ interview.get_location_display }}
-Type:     {{ interview.get_interview_type_display }}
-{% if interview.notes %}
-Notes:    {{ interview.notes }}
+Company:     {{ application.company_name }}
+Position:    {{ application.position }}
+Date:        {{ interview.scheduled_date|date:"l, F j, Y" }}
+Time:        {{ interview.scheduled_date|time:"g:i A" }}
+Location:    {{ interview.get_location_display }}
+Type:        {{ interview.get_interview_type_display }}
+{% if interview.interviewer_name %}Interviewer: {{ interview.interviewer_name }}{% if interview.interviewer_title %} ({{ interview.interviewer_title }}){% endif %}
+{% endif %}{% if interview.feedback %}
+Notes:       {{ interview.feedback }}
 {% endif %}
 
 PREPARATION TIPS
 ----------------
-• Review the job description and your resume
-• Research the company's recent news and culture
-• Prepare questions to ask the interviewer
-• Test your equipment if it's a remote interview
-• Get a good night's sleep!
+* Review the job description and your resume
+* Research the company's recent news and culture
+* Prepare questions to ask the interviewer
+* Test your equipment if it's a remote interview
+* Get a good night's sleep!
 
-Good luck with your interview! 🍀
+Good luck with your interview!
 
 ---
 You're receiving this because you have email reminders enabled.
 Interview Coordinator - Track your job search
-

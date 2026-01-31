@@ -57,44 +57,14 @@ def save_user_profile(sender, instance, **kwargs):
         instance.profile.save()
 
 
-class Interview(models.Model):
+class JobApplication(models.Model):
     """
-    Represents a job interview. This is the core model for the Interview Coordinator app.
-    Tracks company, position, scheduling details, pipeline stage, and status of each interview.
-    Each interview belongs to a specific user (ForeignKey relationship).
+    Represents a job application - the entire journey from applying to a company
+    through all interview stages to final outcome.
+    
+    This is the parent model that contains one or more Interview records
+    (each Interview represents an actual interview event like phone screen, technical, etc.)
     """
-
-    # Choices for interview_type field - represents the format of the interview
-    TYPE_CHOICES = [
-        ("phone", "Phone Screen"),
-        ("technical", "Technical"),
-        ("behavioral", "Behavioral"),
-        ("final", "Final Round"),
-    ]
-
-    # Choices for status field - tracks the current state of the interview appointment
-    STATUS_CHOICES = [
-        ("scheduled", "Scheduled"),
-        ("completed", "Completed"),
-        ("cancelled", "Cancelled"),
-    ]
-
-    # Choices for location field - where the interview takes place
-    LOCATION_CHOICES = [
-        ("onsite", "On-site"),
-        ("remote", "Remote"),
-        ("hybrid", "Hybrid"),
-    ]
-
-    # Interview stage choices - where you are in the interview process
-    INTERVIEW_STAGE_CHOICES = [
-        ("applied", "Applied"),
-        ("screening", "Phone Screening"),
-        ("technical", "Technical Interview"),
-        ("onsite", "Onsite Interview"),
-        ("final", "Final Round"),
-        ("completed", "Completed"),  # Finished all interview rounds
-    ]
 
     # Application status choices - the outcome/decision status
     APPLICATION_STATUS_CHOICES = [
@@ -103,64 +73,24 @@ class Interview(models.Model):
         ("accepted", "Accepted"),
         ("rejected", "Rejected"),
         ("declined", "Declined"),
-        ("withdrawn", "Withdrawn"),  # Candidate withdrew
+        ("withdrawn", "Withdrawn"),
     ]
 
-    # DEPRECATED: Keep for backwards compatibility during migration
-    PIPELINE_CHOICES = [
-        ("applied", "Applied"),
-        ("screening", "Phone Screening"),
-        ("technical", "Technical Interview"),
-        ("onsite", "Onsite Interview"),
-        ("final", "Final Round"),
-        ("offer", "Offer Received"),
-        ("rejected", "Rejected"),
-        ("accepted", "Accepted"),
-        ("declined", "Declined"),
-    ]
-
-    # User ownership - each interview belongs to one user
-    # CASCADE means if user is deleted, their interviews are also deleted
-    # related_name allows reverse lookup: user.interviews.all()
+    # User ownership - each application belongs to one user
+    # CASCADE means if user is deleted, their applications are also deleted
+    # related_name allows reverse lookup: user.applications.all()
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        related_name="interviews",
+        related_name="applications",
     )
 
-    # Core interview details
+    # Core application details
     company_name = models.CharField(max_length=200)
     position = models.CharField(max_length=200)
-    # Optional - null when application submitted but no interview scheduled yet
-    interview_date = models.DateTimeField(null=True, blank=True)
 
-    # Interview metadata - optional until interview is scheduled
-    # These fields are only relevant once an interview date is set
-    interview_type = models.CharField(
-        max_length=20,
-        choices=TYPE_CHOICES,
-        null=True,
-        blank=True,
-    )
-    status = models.CharField(
-        max_length=20,
-        choices=STATUS_CHOICES,
-        null=True,
-        blank=True,
-    )
-    location = models.CharField(
-        max_length=20,
-        choices=LOCATION_CHOICES,
-        null=True,
-        blank=True,
-    )
-
-    # Interview stage - where you are in the interview process
-    interview_stage = models.CharField(
-        max_length=20,
-        choices=INTERVIEW_STAGE_CHOICES,
-        default="applied",
-    )
+    # Date when the application was submitted
+    application_date = models.DateField(null=True, blank=True)
 
     # Application status - the outcome/decision
     application_status = models.CharField(
@@ -169,32 +99,32 @@ class Interview(models.Model):
         default="in_progress",
     )
 
-    # DEPRECATED: Keep for backwards compatibility, will be removed after migration
-    pipeline_stage = models.CharField(
-        max_length=20,
-        choices=PIPELINE_CHOICES,
-        default="applied",
-    )
-
-    # Date when the application was submitted (optional, for tracking time in pipeline)
-    application_date = models.DateField(null=True, blank=True)
-
-    # Optional notes field for additional context
+    # Optional notes field for additional context about the application
     notes = models.TextField(blank=True, null=True)
 
-    # Email reminder tracking - prevents duplicate reminders
-    reminder_sent = models.BooleanField(
-        default=False,
-        help_text="Whether an email reminder has been sent for this interview",
+    # Job posting URL (optional but useful for reference)
+    job_url = models.URLField(max_length=500, blank=True, null=True)
+
+    # Salary information (optional)
+    salary_min = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Minimum salary expectation or offer amount",
+    )
+    salary_max = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Maximum salary expectation or offer amount",
     )
 
-    # Automatic timestamps - auto_now_add sets on creation, auto_now updates on every save
+    # Automatic timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        # Orders interviews by date descending (most recent first)
-        ordering = ["-interview_date"]
+        ordering = ["-created_at"]
+        verbose_name = "Job Application"
+        verbose_name_plural = "Job Applications"
 
     def __str__(self):
         """String representation shown in admin and shell."""
@@ -208,55 +138,64 @@ class Interview(models.Model):
             return (timezone.now().date() - self.application_date).days
         return None
 
-    def save(self, *args, **kwargs):
+    @property
+    def current_stage(self):
         """
-        Override save to handle auto-behaviors:
-        1. Auto-set stage to 'completed' when status becomes offer/accepted
-        2. Track previous stage for round creation
+        Derive the current interview stage from the most recent interview.
+        Returns 'applied' if no interviews exist yet.
         """
-        # Auto-complete stage when final status is set
-        if self.application_status in ["offer", "accepted"]:
-            self.interview_stage = "completed"
+        latest_interview = self.interviews.order_by("-scheduled_date", "-created_at").first()
+        if latest_interview:
+            return latest_interview.interview_type
+        return "applied"
 
-        # Check if this is an update (has pk) and stage is changing
-        is_new = self.pk is None
-        old_stage = None
-        if not is_new:
-            try:
-                old_instance = Interview.objects.get(pk=self.pk)
-                old_stage = old_instance.interview_stage
-            except Interview.DoesNotExist:
-                pass
-
-        super().save(*args, **kwargs)
-
-        # If stage advanced, create a new round for the new stage
-        if not is_new and old_stage and old_stage != self.interview_stage:
-            # Only create round if advancing (not going to 'completed' status)
-            if self.interview_stage != "completed" and self.interview_stage != "applied":
-                InterviewRound.objects.create(
-                    interview=self,
-                    stage=self.interview_stage,
-                    outcome="pending",
-                )
+    @property
+    def next_interview(self):
+        """Get the next upcoming interview for this application."""
+        from django.utils import timezone
+        return self.interviews.filter(
+            scheduled_date__gte=timezone.now(),
+            outcome="pending",
+        ).order_by("scheduled_date").first()
 
 
-class InterviewRound(models.Model):
+class Interview(models.Model):
     """
-    Represents a single interview round/stage in the interview process.
-    Tracks the history of each stage with notes, outcome, and timing.
-    Multiple rounds can belong to one Interview (e.g., screening → technical → onsite).
+    Represents a single interview event in the job application process.
+    
+    Each interview belongs to a JobApplication and tracks:
+    - The type of interview (phone screen, technical, etc.)
+    - When it's scheduled and when it happened
+    - The outcome and any feedback
+    
+    A JobApplication can have multiple interviews as the candidate
+    progresses through the hiring pipeline.
     """
 
-    # Stage choices - matches the interview stages (excluding applied and completed)
-    STAGE_CHOICES = [
-        ("screening", "Phone Screening"),
+    # Interview type choices - expanded to cover more interview formats
+    INTERVIEW_TYPE_CHOICES = [
+        ("phone_screening", "Phone Screening"),
+        ("recruiter_call", "Recruiter Call"),
         ("technical", "Technical Interview"),
+        ("coding", "Coding Challenge"),
+        ("system_design", "System Design"),
+        ("behavioral", "Behavioral Interview"),
+        ("hiring_manager", "Hiring Manager"),
+        ("team_fit", "Team Fit / Culture"),
         ("onsite", "Onsite Interview"),
         ("final", "Final Round"),
+        ("hr_final", "HR Final"),
+        ("offer_call", "Offer Call"),
     ]
 
-    # Outcome choices for each round
+    # Location choices - where the interview takes place
+    LOCATION_CHOICES = [
+        ("remote", "Remote"),
+        ("onsite", "On-site"),
+        ("hybrid", "Hybrid"),
+    ]
+
+    # Outcome choices for each interview
     OUTCOME_CHOICES = [
         ("pending", "Pending"),
         ("passed", "Passed"),
@@ -264,17 +203,17 @@ class InterviewRound(models.Model):
         ("cancelled", "Cancelled"),
     ]
 
-    # Link to parent interview
-    interview = models.ForeignKey(
-        Interview,
+    # Link to parent job application
+    job_application = models.ForeignKey(
+        JobApplication,
         on_delete=models.CASCADE,
-        related_name="rounds",
+        related_name="interviews",
     )
 
-    # Which stage this round represents
-    stage = models.CharField(
+    # Interview type - what kind of interview this is
+    interview_type = models.CharField(
         max_length=20,
-        choices=STAGE_CHOICES,
+        choices=INTERVIEW_TYPE_CHOICES,
     )
 
     # Scheduling
@@ -296,18 +235,45 @@ class InterviewRound(models.Model):
         help_text="How long the interview lasted in minutes",
     )
 
-    # Notes about this specific round
-    notes = models.TextField(
-        blank=True,
-        null=True,
-        help_text="Notes about how this round went, questions asked, etc.",
+    # Location of the interview
+    location = models.CharField(
+        max_length=20,
+        choices=LOCATION_CHOICES,
+        default="remote",
     )
 
-    # Outcome of this round
+    # Interviewer information
+    interviewer_name = models.CharField(
+        max_length=200,
+        blank=True,
+        null=True,
+        help_text="Name(s) of the interviewer(s)",
+    )
+    interviewer_title = models.CharField(
+        max_length=200,
+        blank=True,
+        null=True,
+        help_text="Title/role of the interviewer",
+    )
+
+    # Feedback and notes about this interview
+    feedback = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Feedback received or personal notes about how it went",
+    )
+
+    # Outcome of this interview
     outcome = models.CharField(
         max_length=20,
         choices=OUTCOME_CHOICES,
         default="pending",
+    )
+
+    # Email reminder tracking - prevents duplicate reminders
+    reminder_sent = models.BooleanField(
+        default=False,
+        help_text="Whether an email reminder has been sent for this interview",
     )
 
     # Timestamps
@@ -315,7 +281,25 @@ class InterviewRound(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["created_at"]  # Chronological order
+        ordering = ["scheduled_date", "created_at"]
+        verbose_name = "Interview"
+        verbose_name_plural = "Interviews"
 
     def __str__(self):
-        return f"{self.interview.company_name} - {self.get_stage_display()} ({self.get_outcome_display()})"
+        return f"{self.job_application.company_name} - {self.get_interview_type_display()} ({self.get_outcome_display()})"
+
+    @property
+    def is_upcoming(self):
+        """Check if this interview is in the future."""
+        if not self.scheduled_date:
+            return False
+        from django.utils import timezone
+        return self.scheduled_date > timezone.now()
+
+    @property
+    def is_past(self):
+        """Check if this interview has passed."""
+        if not self.scheduled_date:
+            return False
+        from django.utils import timezone
+        return self.scheduled_date < timezone.now()

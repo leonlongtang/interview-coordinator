@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Interview, InterviewRound, UserProfile
+from .models import JobApplication, Interview, UserProfile
 
 
 # =============================================================================
@@ -84,40 +84,149 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 class InterviewSerializer(serializers.ModelSerializer):
     """
-    Serializer for the Interview model.
-    Converts Interview instances to/from JSON for the API.
-    Includes validation and computed fields for tracking.
+    Serializer for Interview - represents an actual interview event.
+    Each interview belongs to a JobApplication and tracks scheduling,
+    outcome, and feedback for that specific interview.
     """
 
-    # Computed read-only fields for frontend convenience
-    days_in_pipeline = serializers.SerializerMethodField()
-    is_upcoming = serializers.SerializerMethodField()
+    # Display fields for frontend convenience
+    interview_type_display = serializers.CharField(
+        source="get_interview_type_display", read_only=True
+    )
+    outcome_display = serializers.CharField(
+        source="get_outcome_display", read_only=True
+    )
+    location_display = serializers.CharField(
+        source="get_location_display", read_only=True
+    )
+    
+    # Computed fields
+    is_upcoming = serializers.BooleanField(read_only=True)
+    is_past = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Interview
         fields = [
             "id",
+            "job_application",
+            "interview_type",
+            "interview_type_display",
+            "scheduled_date",
+            "completed_date",
+            "duration_minutes",
+            "location",
+            "location_display",
+            "interviewer_name",
+            "interviewer_title",
+            "feedback",
+            "outcome",
+            "outcome_display",
+            "reminder_sent",
+            "is_upcoming",
+            "is_past",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "created_at",
+            "updated_at",
+            "interview_type_display",
+            "outcome_display",
+            "location_display",
+            "is_upcoming",
+            "is_past",
+        ]
+
+    def validate_scheduled_date(self, value):
+        """
+        Prevent scheduling new interviews in the past.
+        Only applies when creating (not updating) an interview.
+        """
+        if value is None:
+            return value
+        # self.instance is None when creating, exists when updating
+        if self.instance is None and value < timezone.now():
+            raise serializers.ValidationError(
+                "Interview date cannot be in the past."
+            )
+        return value
+
+    def validate_duration_minutes(self, value):
+        """Ensure duration is reasonable (1-480 minutes / 8 hours max)."""
+        if value is not None and (value < 1 or value > 480):
+            raise serializers.ValidationError(
+                "Duration must be between 1 and 480 minutes."
+            )
+        return value
+
+    def validate_feedback(self, value):
+        """Sanitize feedback field."""
+        if value:
+            value = sanitize_text(value, max_length=5000)
+            if re.search(r'<script', value, re.IGNORECASE):
+                raise serializers.ValidationError(
+                    "Script tags are not allowed."
+                )
+        return value
+
+    def validate_interviewer_name(self, value):
+        """Sanitize interviewer name field."""
+        if value:
+            value = sanitize_text(value, max_length=200)
+            value = validate_no_html(value)
+        return value
+
+    def validate_interviewer_title(self, value):
+        """Sanitize interviewer title field."""
+        if value:
+            value = sanitize_text(value, max_length=200)
+            value = validate_no_html(value)
+        return value
+
+
+class JobApplicationSerializer(serializers.ModelSerializer):
+    """
+    Serializer for JobApplication - the overall job application journey.
+    Tracks company, position, application date, and final outcome.
+    Individual interviews are managed separately via InterviewSerializer.
+    """
+
+    # Computed read-only fields for frontend convenience
+    days_in_pipeline = serializers.SerializerMethodField()
+    current_stage = serializers.CharField(read_only=True)
+    interview_count = serializers.SerializerMethodField()
+    next_interview_date = serializers.SerializerMethodField()
+
+    class Meta:
+        model = JobApplication
+        fields = [
+            "id",
             "company_name",
             "position",
-            "interview_date",
-            "interview_type",
-            "status",
-            "location",
-            # New split fields
-            "interview_stage",
-            "application_status",
-            # Legacy field (kept for backwards compatibility during transition)
-            "pipeline_stage",
             "application_date",
+            "application_status",
             "notes",
+            "job_url",
+            "salary_min",
+            "salary_max",
             "created_at",
             "updated_at",
             # Computed fields
             "days_in_pipeline",
-            "is_upcoming",
+            "current_stage",
+            "interview_count",
+            "next_interview_date",
         ]
-        # These fields are auto-generated and shouldn't be modified via API
-        read_only_fields = ["id", "created_at", "updated_at", "days_in_pipeline", "is_upcoming"]
+        read_only_fields = [
+            "id",
+            "created_at",
+            "updated_at",
+            "days_in_pipeline",
+            "current_stage",
+            "interview_count",
+            "next_interview_date",
+        ]
 
     def get_days_in_pipeline(self, obj):
         """
@@ -128,31 +237,16 @@ class InterviewSerializer(serializers.ModelSerializer):
             return (timezone.now().date() - obj.application_date).days
         return None
 
-    def get_is_upcoming(self, obj):
-        """
-        Check if interview is scheduled within the next 7 days.
-        Returns False if no interview date is set.
-        """
-        if not obj.interview_date:
-            return False
-        now = timezone.now()
-        seven_days_later = now + timedelta(days=7)
-        return now <= obj.interview_date <= seven_days_later
+    def get_interview_count(self, obj):
+        """Return the total number of interviews for this application."""
+        return obj.interviews.count()
 
-    def validate_interview_date(self, value):
-        """
-        Prevent scheduling new interviews in the past.
-        Only applies when creating (not updating) an interview.
-        Allows None for applications without scheduled interviews.
-        """
-        if value is None:
-            return value
-        # self.instance is None when creating, exists when updating
-        if self.instance is None and value < timezone.now():
-            raise serializers.ValidationError(
-                "Interview date cannot be in the past."
-            )
-        return value
+    def get_next_interview_date(self, obj):
+        """Return the next upcoming interview date, if any."""
+        next_interview = obj.next_interview
+        if next_interview and next_interview.scheduled_date:
+            return next_interview.scheduled_date.isoformat()
+        return None
 
     def validate_company_name(self, value):
         """Sanitize and validate company name."""
@@ -174,80 +268,30 @@ class InterviewSerializer(serializers.ModelSerializer):
             )
         return value
 
-    def validate_location(self, value):
-        """Sanitize location field."""
-        if value:
-            value = sanitize_text(value, max_length=200)
-            value = validate_no_html(value)
-        return value
-
     def validate_notes(self, value):
         """Sanitize notes field - allows longer text but still sanitized."""
         if value:
             value = sanitize_text(value, max_length=5000)
-            # Notes can contain some formatting, just check for script tags
             if re.search(r'<script', value, re.IGNORECASE):
                 raise serializers.ValidationError(
                     "Script tags are not allowed."
                 )
         return value
 
-
-class InterviewRoundSerializer(serializers.ModelSerializer):
-    """
-    Serializer for InterviewRound - tracks individual interview stages.
-    Each round represents one step in the interview process with its own
-    scheduled date, notes, and outcome.
-    """
-
-    stage_display = serializers.CharField(source="get_stage_display", read_only=True)
-    outcome_display = serializers.CharField(source="get_outcome_display", read_only=True)
-
-    class Meta:
-        model = InterviewRound
-        fields = [
-            "id",
-            "interview",
-            "stage",
-            "stage_display",
-            "scheduled_date",
-            "completed_date",
-            "duration_minutes",
-            "notes",
-            "outcome",
-            "outcome_display",
-            "created_at",
-            "updated_at",
-        ]
-        read_only_fields = ["id", "created_at", "updated_at", "stage_display", "outcome_display"]
-
-    def validate_duration_minutes(self, value):
-        """Ensure duration is reasonable (1-480 minutes / 8 hours max)."""
-        if value is not None and (value < 1 or value > 480):
-            raise serializers.ValidationError(
-                "Duration must be between 1 and 480 minutes."
-            )
-        return value
-
-    def validate_notes(self, value):
-        """Sanitize notes field."""
+    def validate_job_url(self, value):
+        """Validate job URL if provided."""
         if value:
-            value = sanitize_text(value, max_length=5000)
-            if re.search(r'<script', value, re.IGNORECASE):
-                raise serializers.ValidationError(
-                    "Script tags are not allowed."
-                )
+            value = sanitize_text(value, max_length=500)
         return value
 
 
-class InterviewWithRoundsSerializer(InterviewSerializer):
+class JobApplicationWithInterviewsSerializer(JobApplicationSerializer):
     """
-    Extended Interview serializer that includes all interview rounds.
-    Used for detailed view of an interview with full history.
+    Extended JobApplication serializer that includes all interviews.
+    Used for detailed view of an application with full interview history.
     """
 
-    rounds = InterviewRoundSerializer(many=True, read_only=True)
+    interviews = InterviewSerializer(many=True, read_only=True)
 
-    class Meta(InterviewSerializer.Meta):
-        fields = InterviewSerializer.Meta.fields + ["rounds"]
-
+    class Meta(JobApplicationSerializer.Meta):
+        fields = JobApplicationSerializer.Meta.fields + ["interviews"]

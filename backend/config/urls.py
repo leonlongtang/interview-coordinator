@@ -39,8 +39,8 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("health/", health_check, name="health_check"),
     
-    # API routes
-    path("api/interviews/", include("interviews.urls")),
+    # API routes - applications and interviews
+    path("api/applications/", include("interviews.urls")),
     
     # ==========================================================================
     # User Profile / Settings endpoints

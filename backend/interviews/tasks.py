@@ -31,9 +31,12 @@ def send_interview_reminder(self, interview_id: int) -> dict:
         dict with status and details
     """
     try:
-        interview = Interview.objects.select_related("user", "user__profile").get(
-            id=interview_id
-        )
+        # Fetch interview with related job application and user profile
+        interview = Interview.objects.select_related(
+            "job_application",
+            "job_application__user",
+            "job_application__user__profile"
+        ).get(id=interview_id)
     except Interview.DoesNotExist:
         logger.error(f"Interview {interview_id} not found")
         return {"status": "error", "message": f"Interview {interview_id} not found"}
@@ -43,20 +46,22 @@ def send_interview_reminder(self, interview_id: int) -> dict:
         logger.info(f"Reminder already sent for interview {interview_id}")
         return {"status": "skipped", "message": "Reminder already sent"}
 
+    # Get user from job application
+    user = interview.job_application.user
+
     # Check user preferences
     try:
-        profile = interview.user.profile
+        profile = user.profile
     except UserProfile.DoesNotExist:
-        # Create profile if it doesn't exist (for older users)
-        profile = UserProfile.objects.create(user=interview.user)
+        profile = UserProfile.objects.create(user=user)
 
     if not profile.email_notifications_enabled:
-        logger.info(f"User {interview.user.username} has notifications disabled")
+        logger.info(f"User {user.username} has notifications disabled")
         return {"status": "skipped", "message": "User has notifications disabled"}
 
     # Calculate time until interview
     now = timezone.now()
-    time_diff = interview.interview_date - now
+    time_diff = interview.scheduled_date - now
     
     if time_diff.days > 0:
         time_until = f"in {time_diff.days} day{'s' if time_diff.days > 1 else ''}"
@@ -66,10 +71,14 @@ def send_interview_reminder(self, interview_id: int) -> dict:
     else:
         time_until = "very soon"
 
+    # Get application details
+    application = interview.job_application
+
     # Render email templates
     context = {
-        "user": interview.user,
+        "user": user,
         "interview": interview,
+        "application": application,
         "time_until": time_until,
     }
     
@@ -77,32 +86,32 @@ def send_interview_reminder(self, interview_id: int) -> dict:
     plain_message = render_to_string("emails/interview_reminder.txt", context)
 
     # Send the email
-    subject = f"📅 Interview Reminder: {interview.company_name} - {interview.position}"
+    subject = f"Interview Reminder: {application.company_name} - {interview.get_interview_type_display()}"
     
     try:
         send_mail(
             subject=subject,
             message=plain_message,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[interview.user.email],
+            recipient_list=[user.email],
             html_message=html_message,
             fail_silently=False,
         )
     except Exception as e:
         logger.error(f"Failed to send email for interview {interview_id}: {e}")
-        # Retry the task
-        raise self.retry(exc=e, countdown=60 * 5)  # Retry in 5 minutes
+        raise self.retry(exc=e, countdown=60 * 5)
 
     # Mark reminder as sent
     interview.reminder_sent = True
     interview.save(update_fields=["reminder_sent"])
 
-    logger.info(f"Reminder sent for interview {interview_id} to {interview.user.email}")
+    logger.info(f"Reminder sent for interview {interview_id} to {user.email}")
     return {
         "status": "success",
         "interview_id": interview_id,
-        "user": interview.user.username,
-        "company": interview.company_name,
+        "user": user.username,
+        "company": application.company_name,
+        "interview_type": interview.get_interview_type_display(),
     }
 
 
@@ -132,21 +141,23 @@ def check_upcoming_interviews() -> dict:
         # Find interviews for this user that:
         # - Are scheduled within the reminder window
         # - Haven't had a reminder sent yet
-        # - Are still scheduled (not cancelled/completed)
+        # - Are still pending (not cancelled/completed)
+        # - Application is still in progress
         interviews = Interview.objects.filter(
-            user=profile.user,
-            interview_date__date=reminder_date.date(),
+            job_application__user=profile.user,
+            scheduled_date__date=reminder_date.date(),
             reminder_sent=False,
-            status="scheduled",
+            outcome="pending",
+            job_application__application_status="in_progress",
         )
         
         for interview in interviews:
-            # Queue the reminder task
             send_interview_reminder.delay(interview.id)
             reminders_queued += 1
             logger.info(
                 f"Queued reminder for interview {interview.id} "
-                f"({interview.company_name}) for user {profile.user.username}"
+                f"({interview.job_application.company_name} - {interview.get_interview_type_display()}) "
+                f"for user {profile.user.username}"
             )
 
     logger.info(f"Check complete: {reminders_queued} reminders queued")
@@ -166,7 +177,7 @@ def send_test_email(email: str) -> dict:
     """
     try:
         send_mail(
-            subject="🧪 Interview Coordinator - Test Email",
+            subject="Interview Coordinator - Test Email",
             message="This is a test email from Interview Coordinator. If you received this, email notifications are working!",
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[email],
@@ -177,4 +188,3 @@ def send_test_email(email: str) -> dict:
     except Exception as e:
         logger.error(f"Failed to send test email: {e}")
         return {"status": "error", "message": str(e)}
-

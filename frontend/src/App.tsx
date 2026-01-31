@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { Layout, ProtectedRoute } from "./components";
-import { Dashboard, AddInterview, EditInterview, Login, Register, Settings } from "./pages";
+import { Dashboard, AddApplication, EditApplication, Login, Register, Settings } from "./pages";
 
 /**
  * Main App component with routing setup.
@@ -17,7 +17,6 @@ import { Dashboard, AddInterview, EditInterview, Login, Register, Settings } fro
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
 
-  // Show nothing while checking auth status
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -26,7 +25,6 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Redirect to dashboard if already authenticated
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
   }
@@ -74,7 +72,7 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Layout>
-              <AddInterview />
+              <AddApplication />
             </Layout>
           </ProtectedRoute>
         }
@@ -84,7 +82,7 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Layout>
-              <EditInterview />
+              <EditApplication />
             </Layout>
           </ProtectedRoute>
         }

@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 
-from .models import Interview, InterviewRound, UserProfile
+from .models import JobApplication, Interview, UserProfile
 
 
 class UserProfileInline(admin.StackedInline):
@@ -41,77 +41,105 @@ class UserProfileAdmin(admin.ModelAdmin):
     search_fields = ["user__username", "user__email"]
 
 
-class InterviewRoundInline(admin.TabularInline):
+class InterviewInline(admin.TabularInline):
     """
-    Inline admin for InterviewRound - shows rounds on Interview edit page.
+    Inline admin for Interview - shows interviews on JobApplication edit page.
     """
-    model = InterviewRound
-    extra = 0  # Don't show empty forms by default
+    model = Interview
+    extra = 0
     readonly_fields = ["created_at"]
-    fields = ["stage", "scheduled_date", "completed_date", "duration_minutes", "outcome", "notes", "created_at"]
+    fields = [
+        "interview_type",
+        "scheduled_date",
+        "completed_date",
+        "location",
+        "interviewer_name",
+        "outcome",
+        "feedback",
+        "reminder_sent",
+        "created_at",
+    ]
+
+
+@admin.register(JobApplication)
+class JobApplicationAdmin(admin.ModelAdmin):
+    """
+    Admin configuration for the JobApplication model.
+    Customizes how applications appear and can be managed in Django Admin.
+    """
+
+    list_display = [
+        "company_name",
+        "position",
+        "application_date",
+        "application_status",
+        "interview_count",
+        "user",
+    ]
+
+    list_filter = ["application_status"]
+
+    search_fields = ["company_name", "position"]
+
+    date_hierarchy = "application_date"
+
+    ordering = ["-created_at"]
+
+    fieldsets = [
+        ("Application Details", {"fields": ["user", "company_name", "position", "job_url"]}),
+        ("Status", {"fields": ["application_date", "application_status"]}),
+        ("Salary", {"fields": ["salary_min", "salary_max"], "classes": ["collapse"]}),
+        ("Additional Info", {"fields": ["notes"], "classes": ["collapse"]}),
+    ]
+
+    list_editable = ["application_status"]
+
+    inlines = [InterviewInline]
+
+    def interview_count(self, obj):
+        """Display the number of interviews for this application."""
+        return obj.interviews.count()
+    interview_count.short_description = "Interviews"
 
 
 @admin.register(Interview)
 class InterviewAdmin(admin.ModelAdmin):
     """
-    Admin configuration for the Interview model.
-    Customizes how interviews appear and can be managed in Django Admin.
+    Admin for Interview - manage individual interview events.
     """
-
-    # Columns displayed in the list view
     list_display = [
-        "company_name",
-        "position",
-        "interview_date",
-        "interview_stage",
-        "application_status",
-        "status",
+        "job_application",
         "interview_type",
-        "location",
-        "reminder_sent",
-    ]
-
-    # Sidebar filters for quick filtering
-    list_filter = ["status", "interview_stage", "application_status", "interview_type", "location", "reminder_sent"]
-
-    # Fields that can be searched via the search box
-    search_fields = ["company_name", "position"]
-
-    # Enables date-based drill-down navigation
-    date_hierarchy = "interview_date"
-
-    # Orders by interview date (most recent first)
-    ordering = ["-interview_date"]
-
-    # Groups fields in the edit form for better organization
-    fieldsets = [
-        ("Interview Details", {"fields": ["user", "company_name", "position", "interview_date"]}),
-        ("Pipeline", {"fields": ["interview_stage", "application_status", "application_date"]}),
-        ("Classification", {"fields": ["interview_type", "status", "location"]}),
-        ("Notifications", {"fields": ["reminder_sent"]}),
-        ("Additional Info", {"fields": ["notes"], "classes": ["collapse"]}),
-    ]
-
-    # Makes the list view editable for quick status updates
-    list_editable = ["status", "interview_stage", "application_status"]
-
-    # Show interview rounds inline
-    inlines = [InterviewRoundInline]
-
-
-@admin.register(InterviewRound)
-class InterviewRoundAdmin(admin.ModelAdmin):
-    """
-    Admin for InterviewRound - manage individual interview stages.
-    """
-    list_display = [
-        "interview",
-        "stage",
         "scheduled_date",
+        "location",
         "outcome",
-        "duration_minutes",
+        "reminder_sent",
         "created_at",
     ]
-    list_filter = ["stage", "outcome"]
-    search_fields = ["interview__company_name", "interview__position"]
+    list_filter = ["interview_type", "outcome", "location", "reminder_sent"]
+    search_fields = [
+        "job_application__company_name",
+        "job_application__position",
+        "interviewer_name",
+    ]
     ordering = ["-scheduled_date"]
+    date_hierarchy = "scheduled_date"
+
+    fieldsets = [
+        ("Interview Details", {
+            "fields": ["job_application", "interview_type", "location"]
+        }),
+        ("Scheduling", {
+            "fields": ["scheduled_date", "completed_date", "duration_minutes"]
+        }),
+        ("Interviewer", {
+            "fields": ["interviewer_name", "interviewer_title"],
+            "classes": ["collapse"]
+        }),
+        ("Result", {
+            "fields": ["outcome", "feedback"]
+        }),
+        ("Notifications", {
+            "fields": ["reminder_sent"]
+        }),
+    ]
