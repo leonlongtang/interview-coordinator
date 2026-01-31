@@ -73,11 +73,14 @@ export default function Dashboard() {
     try {
       setIsLoading(true);
       const data = await interviewService.getAllInterviews();
-      setInterviews(data);
+      // Defensive: ensure data is always an array to prevent .filter() crashes
+      setInterviews(Array.isArray(data) ? data : []);
       setError(null);
     } catch (err) {
       setError("Failed to load interviews. Is the backend running?");
       console.error(err);
+      // Ensure interviews stays an array on error
+      setInterviews([]);
     } finally {
       setIsLoading(false);
     }

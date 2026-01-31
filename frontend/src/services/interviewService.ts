@@ -179,10 +179,21 @@ export interface InterviewWithRounds extends Interview {
 const interviewService = {
   /**
    * Fetch all interviews from the API.
+   * Returns an empty array if the response isn't an array (defensive).
    */
   async getAllInterviews(): Promise<Interview[]> {
     const response = await api.get<Interview[]>("/interviews/");
-    return response.data;
+    // Defensive: DRF might return paginated object { results: [] } or error shape
+    const data = response.data;
+    if (Array.isArray(data)) {
+      return data;
+    }
+    // Handle paginated response if pagination is ever enabled
+    if (data && typeof data === "object" && "results" in data && Array.isArray((data as { results: Interview[] }).results)) {
+      return (data as { results: Interview[] }).results;
+    }
+    console.warn("getAllInterviews: unexpected response shape", data);
+    return [];
   },
 
   /**
