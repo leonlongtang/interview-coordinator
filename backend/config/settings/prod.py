@@ -6,11 +6,12 @@ DEBUG = False
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "").split(",")
 
 # =============================================================================
-# Database Configuration - Use Railway's DATABASE_URL
+# Database Configuration - Use Railway's private URL (no egress) when available
 # =============================================================================
+_db_url = os.environ.get("DATABASE_PRIVATE_URL") or os.environ.get("DATABASE_URL")
 DATABASES = {
     'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL'),
+        default=_db_url,
         conn_max_age=600,
         conn_health_checks=True,
     )

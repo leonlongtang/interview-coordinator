@@ -51,6 +51,7 @@ SITE_ID = 1
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "config.middleware.DisableCSRFForAPI",  # Must be before CsrfViewMiddleware
     "django.contrib.sessions.middleware.SessionMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -83,14 +84,15 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 # Database (PostgreSQL)
-# Railway/Heroku provide DATABASE_URL; local dev often uses DB_NAME, DB_USER, etc.
-# Check DATABASE_URL first so base.py loads without KeyError before prod.py overrides.
-if os.environ.get("DATABASE_URL"):
+# Railway: prefer DATABASE_PRIVATE_URL (no egress fees). Fall back to DATABASE_URL.
+# Heroku/local: use DATABASE_URL or individual DB_* vars.
+_db_url = os.environ.get("DATABASE_PRIVATE_URL") or os.environ.get("DATABASE_URL")
+if _db_url:
     import dj_database_url
 
     DATABASES = {
         "default": dj_database_url.config(
-            default=os.environ.get("DATABASE_URL"),
+            default=_db_url,
             conn_max_age=600,
             conn_health_checks=True,
         )
