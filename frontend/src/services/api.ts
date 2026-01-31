@@ -1,10 +1,31 @@
 import axios from "axios";
 
 /**
+ * Ensure a URL has a protocol prefix. If no protocol is provided,
+ * https:// is prepended. This guards against misconfigured env vars
+ * like "example.com" instead of "https://example.com".
+ */
+function ensureProtocol(url: string): string {
+  if (!url) return url;
+  // If URL already has a protocol (http:// or https://), return as-is
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+  // Default to https for production URLs
+  return `https://${url}`;
+}
+
+/**
  * Backend API base URL. Vite inlines VITE_API_URL at build time;
  * fallback to localhost for local dev. No trailing slash.
+ * 
+ * The ensureProtocol wrapper handles cases where the env var is set
+ * without a protocol (e.g., "backend.railway.app" instead of
+ * "https://backend.railway.app"), which would cause axios to treat
+ * it as a relative URL.
  */
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const rawApiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE = ensureProtocol(rawApiUrl);
 
 /**
  * Axios instance configured for our Django backend API.

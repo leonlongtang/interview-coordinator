@@ -136,7 +136,10 @@ export async function refreshAccessToken(): Promise<string | null> {
 
 /**
  * Get the currently authenticated user's info.
- * Returns null if not authenticated.
+ * Returns null if not authenticated or if the response is invalid.
+ * 
+ * Validates the response structure to prevent issues when the API
+ * returns unexpected data (e.g., HTML from a misconfigured URL).
  */
 export async function getCurrentUser(): Promise<User | null> {
   const token = getAccessToken();
@@ -146,7 +149,21 @@ export async function getCurrentUser(): Promise<User | null> {
 
   try {
     const response = await api.get<User>("/auth/user/");
-    return response.data;
+    const data = response.data;
+
+    // Validate that we got a proper user object, not HTML or other junk.
+    // A valid user object should have at least an id or username/email.
+    if (
+      typeof data !== "object" ||
+      data === null ||
+      (!("pk" in data) && !("id" in data) && !("username" in data))
+    ) {
+      console.error("getCurrentUser: Invalid response format, clearing tokens");
+      clearTokens();
+      return null;
+    }
+
+    return data;
   } catch {
     return null;
   }

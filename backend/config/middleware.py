@@ -13,17 +13,17 @@ class DisableCSRFForAPI:
 
     JWT auth is stateless—tokens in Authorization header. CSRF protects
     against cookie-based attacks; our API doesn't use session cookies.
-    Must run before CsrfViewMiddleware so process_view patches the view first.
+    
+    Uses Django's internal _dont_enforce_csrf_checks flag which is the most
+    reliable way to skip CSRF validation for specific requests.
     """
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        return self.get_response(request)
-
-    def process_view(self, request, view_func, view_args, view_kwargs):
-        # CsrfViewMiddleware checks getattr(view_func, 'csrf_exempt', False)
+        # Set internal Django flag to skip CSRF checks for API paths
+        # This is the same flag used by @csrf_exempt decorator internally
         if request.path.startswith("/api/"):
-            view_func.csrf_exempt = True
-        return None
+            request._dont_enforce_csrf_checks = True
+        return self.get_response(request)
