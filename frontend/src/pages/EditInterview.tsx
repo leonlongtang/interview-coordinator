@@ -40,7 +40,7 @@ export default function EditInterview() {
 
   const handleSubmit = async (data: InterviewFormData) => {
     if (!id) return;
-    const updated = await interviewService.updateInterview(Number(id), data);
+    await interviewService.updateInterview(Number(id), data);
     // Refetch to get updated rounds (in case stage change created a new round)
     const refreshed = await interviewService.getInterview(Number(id));
     setInterview(refreshed);

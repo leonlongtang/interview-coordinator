@@ -37,7 +37,7 @@ export default function InterviewRounds({
   interviewId,
   rounds,
   onRoundsChange,
-  currentStage,
+  currentStage: _currentStage,
 }: InterviewRoundsProps) {
   const [isAddingRound, setIsAddingRound] = useState(false);
   const [editingRoundId, setEditingRoundId] = useState<number | null>(null);

@@ -6,7 +6,7 @@ import type { InputHTMLAttributes } from "react";
  */
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
-  label: string;
+  label?: string;
   error?: string;
   hint?: string;
 }
@@ -19,11 +19,12 @@ export default function Input({
   id,
   ...props
 }: InputProps) {
-  // Generate an ID from the label if not provided
-  const inputId = id || label.toLowerCase().replace(/\s+/g, "-");
+  // Generate an ID from the label if not provided; id is required when label is omitted
+  const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
 
   return (
     <div className="flex flex-col gap-1">
+      {label && (
       <label
         htmlFor={inputId}
         className="text-sm font-medium text-gray-700"
@@ -31,6 +32,7 @@ export default function Input({
         {label}
         {props.required && <span className="text-red-500 ml-1">*</span>}
       </label>
+      )}
       <input
         id={inputId}
         className={`

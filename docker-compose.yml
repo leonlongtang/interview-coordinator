@@ -15,7 +15,11 @@ services:
     restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        # API URL for browser (host makes requests). Dev server hot-reloads.
+        VITE_API_URL: http://localhost:8000
     container_name: interview-frontend
     command: npm run dev -- --host
     volumes:
