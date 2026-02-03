@@ -21,6 +21,12 @@ The goal is to reduce coordination overhead so humans focus on decisions, not lo
 
 ---
 
+## Live Demo
+
+🌐 **Deployed Application**: [https://frontend-production-d6eb6.up.railway.app/](https://frontend-production-d6eb6.up.railway.app/)
+
+---
+
 ## Architecture Overview
 
 **Backend**
