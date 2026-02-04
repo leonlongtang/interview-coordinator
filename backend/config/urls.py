@@ -71,9 +71,8 @@ urlpatterns = [
     path("api/auth/", include("dj_rest_auth.urls")),
     
     # POST /api/auth/registration/ - Register new user (rate limited)
+    # Note: dj-rest-auth registration URLs (verify-email, etc.) are included via the custom view
     path("api/auth/registration/", RateLimitedRegisterView.as_view(), name="rest_register"),
-    # Include remaining registration URLs (verify-email, etc.)
-    path("api/auth/registration/", include("dj_rest_auth.registration.urls")),
     
     # POST /api/auth/token/refresh/ - Get new access token using refresh token
     path("api/auth/token/refresh/", RateLimitedTokenRefreshView.as_view(), name="token_refresh"),

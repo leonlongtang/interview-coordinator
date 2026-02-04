@@ -24,22 +24,6 @@ const OUTCOME_COLORS: Record<InterviewOutcome, string> = {
   cancelled: "bg-orange-100 text-orange-700",
 };
 
-// Interview type icons (simple text-based)
-const TYPE_ICONS: Record<InterviewType, string> = {
-  phone_screening: "phone",
-  recruiter_call: "phone",
-  technical: "code",
-  coding: "terminal",
-  system_design: "box",
-  behavioral: "users",
-  hiring_manager: "briefcase",
-  team_fit: "users",
-  onsite: "building",
-  final: "flag",
-  hr_final: "clipboard",
-  offer_call: "gift",
-};
-
 export default function Interviews({
   applicationId,
   interviews,
